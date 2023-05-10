@@ -24,7 +24,7 @@ def jpg_to_bin(in_file):
         image = np.expand_dims(image, axis=-1)
     image = np.transpose(image, axes=[2, 0, 1])  # HWC to CHW
     image = image.mean(axis=0, keepdims=True).astype(image.dtype)
-    image_pb = image_pb2.Image(shape=list(image.shape), values=image.tostring())
+    image_pb = image_pb2.Image(shape=list(image.shape), values=image.tobytes())
     with open("{}.bin".format(in_file), "wb") as out_file:
         out_file.write(image_pb.SerializeToString())
     return None

@@ -2,6 +2,7 @@
 #include <chrono> // measuring wall time
 #include <string>
 #include <iomanip>
+#include <iostream>
 #include <poplar/DeviceManager.hpp>
 #include <poplar/Engine.hpp>
 

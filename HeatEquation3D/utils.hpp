@@ -134,6 +134,11 @@ inline static unsigned index(unsigned x, unsigned y, unsigned z, unsigned width,
   return (z) + (y)*(depth) + (x)*(width)*(depth);
 }
 
+/*
+    id - x * y 
+    p  - ipu no
+    n  - total number of ipu
+*/
 inline static unsigned block_low(unsigned id, unsigned p, unsigned n) {
   return (id*n)/p; 
 }
