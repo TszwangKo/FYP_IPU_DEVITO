@@ -196,7 +196,10 @@ void workDivision(utils::Options &options) {
   }
 }
 
-
+void printIfNan(float number, std::string message) {
+    if( isnan(number) )
+        std::cout << "number" << message << std::endl;
+}
 std::vector<float> diffusionEquationCpu(
   const std::vector<float> initial_values, 
   const utils::Options &options) {
@@ -231,17 +234,18 @@ std::vector<float> diffusionEquationCpu(
     b[i] = initial_values[i]; 
   }
 
-  // Heat Equation iterations
+  // Diffusion Equation iterations
   for (std::size_t t = 0; t < iter; ++t) {
     for (std::size_t x = 2; x < h - 2; ++x) {
       for (std::size_t y = 2; y < w - 2; ++y) { 
         for (std::size_t z = 2; z < d - 2; ++z) {
-            const float r4 = -2.5f/b[index(x,y,z,w,d)];
+            const float r4 = -2.5f * b[index(x,y,z,w,d)];
+            // a[index(x,y,z,w,d)] = b[index(x,y,z,w,d)]+1;
             a[index(x,y,z,w,d)] = dt * ( options.alpha * ( 
                                         r1 * ( r4 -
                                               8.33333333e-2F * ( b[index(x-2,y,z,w,d)] + b[index(x+2,y,z,w,d)] ) +
                                               1.33333333F * ( b[index(x-1,y,z,w,d)] + b[index(x+1,y,z,w,d)] ) 
-                                             )+
+                                             ) +
                                         r2 * ( r4 -
                                               8.33333333e-2F * ( b[index(x,y-2,z,w,d)] + b[index(x,y+2,z,w,d)] ) +
                                               1.33333333F * ( b[index(x,y-1,z,w,d)] + b[index(x,y+1,z,w,d)] ) 
@@ -252,7 +256,7 @@ std::vector<float> diffusionEquationCpu(
                                              )
                                     ) +
                                         r0 * b[index(x,y,z,w,d)]
-                                    );
+                                  );
         }
       }
     }
@@ -282,11 +286,12 @@ void printMeanSquaredError(
   for (std::size_t x = 2; x < h - 2; ++x) {
     for (std::size_t y = 2; y < w - 2; ++y) { 
       for (std::size_t z = 2; z < d - 2; ++z) {
-          if ( isnan(b[index(x,y,z,w,d)]) ){
-              std::cout << "cpu (b): " << b[index(x,y,z,w,d)] << " at index: " << index(x,y,z,w,d) << " x: " << x << " y: " << y << " z: " <<  z << " w: " << w << " d: " << d << std::endl;
-          }
         diff = double(a[index(x,y,z,w,d)] - b[index(x,y,z,w,d)]);
         squared_error += diff*diff;
+        if( diff!= 0 ){
+            std::cout << "ipu: " << a[index(x,y,z,w,d)] << std::endl;
+            std::cout << "cpu: " << b[index(x,y,z,w,d)] << std::endl;
+        }
       }
     }
   }
@@ -296,6 +301,44 @@ void printMeanSquaredError(
   if (mean_squared_error == double(0.0)) 
     std::cout << " (exactly)";
   std::cout << "\n";
+}
+
+void printMatricesAndNorm(
+  std::vector<float> a, 
+  std::vector<float> b, 
+  utils::Options &options) {
+  /*
+   * Compute the MSE, __only the inner elements__, of two 3D grids
+   */
+  double normIpu = 0, normCpu = 0;
+  std::size_t h = options.height;
+  std::size_t w = options.width;
+  std::size_t d = options.depth;
+    
+  
+  std::cout << "IPU RESULT:" << std::endl;
+  for (std::size_t x = 0; x < h ; ++x) {
+    std::cout << "x = " << x << std::endl << std::endl;
+    for (std::size_t y = 0; y < w ; ++y) { 
+        std::cout << '\t';
+      for (std::size_t z = 0; z < d ; ++z) {
+            std::cout << a[index(x,y,z,w,d)] << ' ';
+            normIpu += a[index(x,y,z,w,d)];
+            normCpu += b[index(x,y,z,w,d)];
+      }
+        std::cout << std::endl;
+    }
+    std::cout << std::endl << std::endl;
+  }
+    
+    std::cout << "\n IPU L2 Norm =" << normIpu << std::endl;
+    std::cout << "\n CPU L2 Norm =" << normCpu << std::endl;
+  // double mean_squared_error = squared_error / (double) ((h-4)*(w-4)*(d-4));
+
+  // std::cout << "\nMean Squared Error (IPU vs. CPU) = " << mean_squared_error;
+  // if (mean_squared_error == double(0.0)) 
+  //   std::cout << " (exactly)";
+  // std::cout << "\n";
 }
 
 void printResults(utils::Options &options, double wall_time) {

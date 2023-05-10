@@ -51,26 +51,30 @@ poplar::ComputeSet createComputeSet(
     std::size_t inter_depth = ipu_in_slice.shape()[2];
     //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ^ why option.depth-2? why offset_back? why overlapping 2 layers instead of 1? ^ !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
+      
+    // Iterate through Tiles
     for (std::size_t x = 0; x < nh; ++x) {
       for (std::size_t y = 0; y < nw; ++y) {
         for (std::size_t z = 0; z < nd; ++z) {
-          unsigned tile_id = index(x, y, z, nw, nd) + ipu*options.tiles_per_ipu; 
-          unsigned tile_x = block_low(x, nh, options.height-4) + 1;
-          unsigned tile_y = block_low(y, nw, options.width-4) + 1;
-          unsigned tile_height = block_size(x, nh, options.height-4);
-          unsigned tile_width = block_size(y, nw, options.width-4);
-          unsigned z_low = block_low(z, nd, inter_depth-4) + 1;
-          unsigned z_high = block_high(z, nd, inter_depth-4) + 1;
+          unsigned tile_id = index(x, y, z, nw, nd) + ipu*options.tiles_per_ipu;    // unique tile_id among all ipus
+          unsigned tile_x = block_low(x, nh, options.height-4) + 2;                 // Starting x-coordinate of the tile (+2 is padding for space order 4) 
+          unsigned tile_y = block_low(y, nw, options.width-4) + 2;                  // Starting x-coordinate of the tile (+2 is padding for space order 4)
+          unsigned tile_height = block_size(x, nh, options.height-4);               // height of the tile (That needed to be computed)
+          unsigned tile_width = block_size(y, nw, options.width-4);                 // width of the tile (That needed to be computed)
+          unsigned z_low = block_low(z, nd, inter_depth-4) + 2;                     // z coordinate of the tile within the IPU (+2 is padding for space order 4)
+          unsigned z_high = block_high(z, nd, inter_depth-4) + 2;
           unsigned tile_depth = z_high - z_low;
 
-          std::vector<std::size_t> shape = {tile_height, tile_width, tile_depth};
+          /* Records smallest largest volume slice occured over the computation */
+          std::vector<std::size_t> shape = {tile_height, tile_width, tile_depth}; 
           if (volume(shape) < volume(options.smallest_slice))
             options.smallest_slice = shape;
           if (volume(shape) > volume(options.largest_slice)) 
             options.largest_slice = shape;
-
-          if ((x == 0) || (x == nh - 1)) {
-            halo_volume += tile_width*tile_depth;
+            
+          //! Get back to halo_volume later !//
+          if ((x == 0) || (x == nh - 1)) {              // edge slices of x
+            halo_volume += tile_width*tile_depth;       // y*z 
           } else {
             halo_volume += 2*tile_width*tile_depth;
           }
@@ -85,14 +89,15 @@ poplar::ComputeSet createComputeSet(
             halo_volume += 2*tile_height*tile_width;
           }
 
+          // iterate through the workers
           for (std::size_t worker_xi = 0; worker_xi < nwh; ++worker_xi) {
             for (std::size_t worker_yi = 0; worker_yi < nww; ++worker_yi) {
               
               // Dividing tile work among workers
-              unsigned x_low = tile_x + block_low(worker_xi, nwh, tile_height);
-              unsigned x_high = tile_x + block_high(worker_xi, nwh, tile_height);
-              unsigned y_low = tile_y + block_low(worker_yi, nww, tile_width);
-              unsigned y_high = tile_y + block_high(worker_yi, nww, tile_width);
+              unsigned x_low = tile_x + block_low(worker_xi, nwh, tile_height);     // low x-coordinate within the ipu
+              unsigned x_high = tile_x + block_high(worker_xi, nwh, tile_height);   // high x-coordinate within the ipu
+              unsigned y_low = tile_y + block_low(worker_yi, nww, tile_width);      // low y-coordinate within the ipu
+              unsigned y_high = tile_y + block_high(worker_yi, nww, tile_width);    // high y-coordinate within the ipu
 
               // NOTE: include overlap for "in_slice"
               auto in_slice = ipu_in_slice.slice(
@@ -283,8 +288,11 @@ int main (int argc, char** argv) {
     std::vector<float> cpu_results(total_volume);
 
     // initialize initial values with random floats
-    for (std::size_t i = 0; i < total_volume; ++i)
-      initial_values[i] = randomFloat();
+    for (std::size_t i = 0; i < total_volume/2; ++i)
+      initial_values[i] = 1.0f ;//randomFloat();
+    for (std::size_t i = total_volume/2; i < total_volume; ++i)
+      initial_values[i] = 2.0f ;//randomFloat();
+      
 
     // perform CPU execution (and later compute MSE in IPU vs. CPU execution)
     if (options.cpu) 
@@ -310,8 +318,10 @@ int main (int argc, char** argv) {
     double wall_time = 1e-9*diff.count();
     printResults(options, wall_time);
 
-    if (options.cpu)
-      printMeanSquaredError(ipu_results, cpu_results, options);
+    if (options.cpu) { 
+        printMatricesAndNorm(ipu_results, cpu_results, options);
+        printMeanSquaredError(ipu_results, cpu_results, options);
+    }
 
     // End of try block
   } catch (const std::exception &e) {
