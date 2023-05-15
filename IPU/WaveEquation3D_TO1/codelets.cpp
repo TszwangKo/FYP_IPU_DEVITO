@@ -32,9 +32,8 @@ public:
     const float dt = 0.25f * hx * hy * hz / 0.5f;
 
     const float r0 = 1.0F / dt;
-    const float r1 = 1.0F / (hx * hx);
-    const float r2 = 1.0F / (hy * hy);
-    const float r3 = 1.0F / (hz * hz);
+
+    const unsigned padded_width = worker_width + 2*padding;
 
     for (std::size_t x = padding; x < worker_height + padding; ++x)
     {
@@ -42,20 +41,16 @@ public:
       {
         for (std::size_t z = padding; z < worker_depth + padding; ++z)
         {
-
-          const unsigned padded_width = worker_width + 2*padding;
-          // const float r4 = -2.5F * in[idx(x, y, padded_width)][z];
-          out[idx(x-padding,y-padding,worker_width)][z-padding] = in[idx(x,y,padded_width)][z] + damp[idx(x,y,padded_width)][z] +  vp[idx(x,y,padded_width)][z];
-          // out[idx(x - 2, y - 2, worker_width)][z - 2] = dt * (alpha * ( r1 * (r4 -
-          //                                                                    8.33333333e-2F * (in[idx(x - 2, y, padded_width)][z] + in[idx(x + 2, y, padded_width)][z]) +
-          //                                                                    1.33333333F * (in[idx(x - 1, y, padded_width)][z] + in[idx(x + 1, y, padded_width)][z])) +
-          //                                                               r2 * (r4 -
-          //                                                                    8.33333333e-2F * (in[idx(x, y - 2, padded_width)][z] + in[idx(x, y + 2, padded_width)][z]) +
-          //                                                                    1.33333333F * (in[idx(x, y - 1, padded_width)][z] + in[idx(x, y + 1, padded_width)][z])) +
-          //                                                               r3 * (r4 -
-          //                                                                    8.33333333e-2F * (in[idx(x, y, padded_width)][z - 2] + in[idx(x, y, padded_width)][z + 2]) +
-          //                                                                    1.33333333F * (in[idx(x, y, padded_width)][z - 1] + in[idx(x, y, padded_width)][z + 1]))) +
-          //                                                     r0 * in[idx(x, y, padded_width)][z]);
+          const float r1 = 1.0F/(vp[idx(x,y,padded_width)][z]*vp[idx(x,y,padded_width)][z]);
+          
+          // out[idx(x-padding,y-padding,worker_width)][z-padding] = in[idx(x,y,padded_width)][z] + damp[idx(x,y,padded_width)][z] +  vp[idx(x,y,padded_width)][z];
+          out[idx(x-padding,y-padding,worker_width)][z-padding] = (
+                    r0*damp[idx(x-3,y-3,padded_width)][z-3]*in[idx(x,y,padded_width)][z]  
+                    + r1*(r0*in[idx(x,y,padded_width)][z])  
+                    + 8.33333315e-4F*(-in[idx(x-2,y,padded_width)][z] - in[idx(x,y-2,padded_width)][z] - in[idx(x,y,padded_width)][z-2] - in[idx(x,y,padded_width)][z+2] - in[idx(x,y+2,padded_width)][z] - in[idx(x+2,y,padded_width)][z]) 
+                    + 1.3333333e-2F*(in[idx(x-1,y,padded_width)][z] + in[idx(x,y-1,padded_width)][z] + in[idx(x,y,padded_width)][z-1] + in[idx(x,y,padded_width)][z+1] + in[idx(x,y+1,padded_width)][z] + in[idx(x+1,y,padded_width)][z]) 
+                    - 7.49999983e-2F*in[idx(x,y,padded_width)][z]
+                  )/(r0*r1 + r0*damp[idx(x-3,y-3,padded_width)][z-3]);
         }
       }
     }

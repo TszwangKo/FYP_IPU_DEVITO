@@ -78,7 +78,7 @@ namespace utils {
     )
     (
       "padding",
-      po::value<std::size_t>(&options.padding)->default_value(2),
+      po::value<std::size_t>(&options.padding)->default_value(3),
       "Padding of elements around calculation."
     )
     (
@@ -217,17 +217,14 @@ std::vector<float> WaveEquationCpu(
    * solution.
    * NOTE: can be very slow for large grids/large number of iterations
    */
-  const float beta = 1.0 - 6.0*options.alpha;
     
   const float hx = 0.2f;
   const float hy = 0.2f;
   const float hz = 0.2f;
   const float dt = 0.25f * hx * hy * hz / 0.5f;
 
-  const float r0 = 1/dt;
-  const float r1 = 1/(hx*hx);
-  const float r2 = 1/(hy*hy);
-  const float r3 = 1/(hz*hz);
+  const float r0 = 1.0f/dt;
+ 
 
   unsigned h = options.height;
   unsigned w = options.width;
@@ -249,24 +246,15 @@ std::vector<float> WaveEquationCpu(
     for (std::size_t x = padding; x < h - padding; ++x) {
       for (std::size_t y = padding; y < w - padding; ++y) { 
         for (std::size_t z = padding; z < d - padding; ++z) {
-            // const float r4 = -2.5f * b[index(x,y,z,w,d)];
-            a[index(x,y,z,w,d)] = b[index(x,y,z,w,d)] + damp[index(x,y,z,w,d)] + vp[index(x,y,z,w,d)];
-            // a[index(x,y,z,w,d)] = dt * ( options.alpha * ( 
-            //                             r1 * ( r4 -
-            //                                   8.33333333e-2F * ( b[index(x-2,y,z,w,d)] + b[index(x+2,y,z,w,d)] ) +
-            //                                   1.33333333F * ( b[index(x-1,y,z,w,d)] + b[index(x+1,y,z,w,d)] ) 
-            //                                  ) +
-            //                             r2 * ( r4 -
-            //                                   8.33333333e-2F * ( b[index(x,y-2,z,w,d)] + b[index(x,y+2,z,w,d)] ) +
-            //                                   1.33333333F * ( b[index(x,y-1,z,w,d)] + b[index(x,y+1,z,w,d)] ) 
-            //                                  )+
-            //                             r3 * ( r4 -
-            //                                   8.33333333e-2F * (b[index(x,y,z-2,w,d)] + b[index(x,y,z+2,w,d)] ) +
-            //                                   1.33333333F * (b[index(x,y,z-1,w,d)] + b[index(x,y,z+1,w,d)]) 
-            //                                  )
-            //                         ) +
-            //                             r0 * b[index(x,y,z,w,d)]
-            //                       );
+            float r1 = 1.0F/(vp[index(x,y,z,w,d)]*vp[index(x,y,z,w,d)]);
+            // a[index(x,y,z,w,d)] = b[index(x,y,z,w,d)] + damp[index(x,y,z,w,d)] + vp[index(x,y,z,w,d)];
+            a[index(x,y,z,w,d)] = (
+                          r0*damp[index(x-3,y-3,z-3,w,d)]*b[index(x,y,z,w,d)] + 
+                          r1*(r0*b[index(x,y,z,w,d)]) + 
+                          8.33333315e-4F*(-b[index(x-2,y,z,w,d)] - b[index(x,y-2,z,w,d)] - b[index(x,y,z-2,w,d)] - b[index(x,y,z+2,w,d)] - b[index(x,y+2,z,w,d)] - b[index(x+2,y,z,w,d)]) + 
+                          1.3333333e-2F*(b[index(x-1,y,z,w,d)] + b[index(x,y-1,z,w,d)] + b[index(x,y,z-1,w,d)] + b[index(x,y,z+1,w,d)] + b[index(x,y+1,z,w,d)] + b[index(x+1,y,z,w,d)]) - 
+                          7.49999983e-2F*b[index(x,y,z,w,d)]
+                        )/(r0*r1 + r0*damp[index(x-3,y-3,z-3,w,d)]);
         }
       }
     }

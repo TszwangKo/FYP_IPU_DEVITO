@@ -323,14 +323,17 @@ int main (int argc, char** argv) {
     std::vector<float> cpu_results(total_volume);
 
     // initialize initial values with random floats
-    for (std::size_t i = 0; i < total_volume/2; ++i)
-      initial_values[i] = 1.0f ;//randomFloat();
-    for (std::size_t i = total_volume/2; i < total_volume; ++i)
-      initial_values[i] = 1.0f ;//randomFloat();
+    // for (std::size_t i = 0; i < total_volume/2; ++i)
+    //   initial_values[i] = 1.0f ;//randomFloat();
+    // for (std::size_t i = total_volume/2; i < total_volume; ++i)
+    //   initial_values[i] = 2.0f ;//randomFloat();
+    for (std::size_t i = 0; i < total_volume; ++i)
+      initial_values[i] = float(i*100000000) ;//randomFloat();
+
       
     for (std::size_t i = 0; i < total_volume; i ++ ){
-      damp_coef[i] = float(i) ; //randomFloat();
-      vp_coef[i] = float(i);
+      damp_coef[i] = randomFloat()*1000;
+      vp_coef[i] = randomFloat()*1000;
     }
   
     // perform CPU execution (and later compute MSE in IPU vs. CPU execution)
@@ -358,7 +361,7 @@ int main (int argc, char** argv) {
     printResults(options, wall_time);
 
     if (options.cpu) { 
-        // printMatrix(cpu_results,options);
+        printMatrix(ipu_results,options);
         printNorms(ipu_results, cpu_results, options);
         printMeanSquaredError(ipu_results, cpu_results, options);
     }
