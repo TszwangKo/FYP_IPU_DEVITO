@@ -34,6 +34,7 @@ poplar::ComputeSet createComputeSet(
   unsigned nd = options.splits[2]; // Number of splits in depth
   unsigned nwh = 2; // Splits in height (among workers on a tile)
   unsigned nww = 3; // Splits in width (among workers on a tile)
+  std::size_t padding = options.padding;
   std::size_t halo_volume = 0;
 
   for (std::size_t ipu = 0; ipu < options.num_ipus; ++ipu) {
@@ -41,7 +42,7 @@ poplar::ComputeSet createComputeSet(
     // TODO: Make an inline function for this for various space order (amount of overlap between IPU)
   
     // Ensure overlapping grids among the IPUs
-    std::size_t offset_back = 4;
+    std::size_t offset_back = 2*padding;
     auto ipu_in_slice = in.slice(
       {0, 0, block_low(ipu, options.num_ipus, options.depth-offset_back)},
       {options.height, options.width, block_high(ipu, options.num_ipus, options.depth-offset_back) + offset_back}
@@ -69,12 +70,12 @@ poplar::ComputeSet createComputeSet(
       for (std::size_t y = 0; y < nw; ++y) {
         for (std::size_t z = 0; z < nd; ++z) {
           unsigned tile_id = index(x, y, z, nw, nd) + ipu*options.tiles_per_ipu;    // unique tile_id among all ipus
-          unsigned tile_x = block_low(x, nh, options.height-4) + 2;                 // Starting x-coordinate of the tile (+2 is padding for space order 4) 
-          unsigned tile_y = block_low(y, nw, options.width-4) + 2;                  // Starting x-coordinate of the tile (+2 is padding for space order 4)
-          unsigned tile_height = block_size(x, nh, options.height-4);               // height of the tile (That needed to be computed)
-          unsigned tile_width = block_size(y, nw, options.width-4);                 // width of the tile (That needed to be computed)
-          unsigned z_low = block_low(z, nd, inter_depth-4) + 2;                     // z coordinate of the tile within the IPU (+2 is padding for space order 4)
-          unsigned z_high = block_high(z, nd, inter_depth-4) + 2;
+          unsigned tile_x = block_low(x, nh, options.height-2*padding) + padding;                 // Starting x-coordinate of the tile (+padding is padding for space order 2*padding) 
+          unsigned tile_y = block_low(y, nw, options.width-2*padding) + padding;                  // Starting x-coordinate of the tile (+padding is padding for space order 2*padding)
+          unsigned tile_height = block_size(x, nh, options.height-2*padding);               // height of the tile (That needed to be computed)
+          unsigned tile_width = block_size(y, nw, options.width-2*padding);                 // width of the tile (That needed to be computed)
+          unsigned z_low = block_low(z, nd, inter_depth-2*padding) + padding;                     // z coordinate of the tile within the IPU (+padding is padding for space order 2*padding)
+          unsigned z_high = block_high(z, nd, inter_depth-2*padding) + padding;
           unsigned tile_depth = z_high - z_low;
 
           /* Records smallest largest volume slice occured over the computation */
@@ -113,18 +114,18 @@ poplar::ComputeSet createComputeSet(
 
               // NOTE: include overlap for "in_slice"
               auto in_slice = ipu_in_slice.slice(
-                {x_low-2, y_low-2, z_low-2},
-                {x_high+2, y_high+2, z_high+2}
+                {x_low-padding, y_low-padding, z_low-padding},
+                {x_high+padding, y_high+padding, z_high+padding}
               );
 
               auto damp_slice = ipu_damp_slice.slice(
-                {x_low-2, y_low-2, z_low-2},
-                {x_high+2, y_high+2, z_high+2}
+                {x_low-padding, y_low-padding, z_low-padding},
+                {x_high+padding, y_high+padding, z_high+padding}
               );
 
               auto vp_slice = ipu_vp_slice.slice(
-                {x_low-2, y_low-2, z_low-2},
-                {x_high+2, y_high+2, z_high+2}
+                {x_low-padding, y_low-padding, z_low-padding},
+                {x_high+padding, y_high+padding, z_high+padding}
               );
 
               auto out_slice = ipu_out_slice.slice(
@@ -141,6 +142,7 @@ poplar::ComputeSet createComputeSet(
               graph.setInitialValue(v["worker_height"], x_high - x_low);
               graph.setInitialValue(v["worker_width"], y_high - y_low);
               graph.setInitialValue(v["worker_depth"], z_high - z_low);
+              graph.setInitialValue(v["padding"], padding);
               graph.setInitialValue(v["alpha"], options.alpha);
               graph.setTileMapping(v, tile_id);
             }
@@ -163,21 +165,22 @@ std::vector<poplar::program::Program> createIpuPrograms(
   auto damp = graph.addConstant(poplar::FLOAT, {options.height, options.width, options.depth}, damp_coef.data() , "damp"); 
   auto vp = graph.addConstant(poplar::FLOAT, {options.height, options.width, options.depth}, vp_coef.data() , "vp"); 
   
+  std::size_t padding = options.padding;
   for (std::size_t ipu = 0; ipu < options.num_ipus; ++ipu) {
 
     // Partition the entire grid FIRST among IPUs by splitting in depth (dimension 2)
-    std::size_t offset_front = (ipu == 0) ? 0 : 1;
-    std::size_t offset_back = (ipu == options.num_ipus - 1) ? 2 : 1;
+    std::size_t offset_front = (ipu == 0) ? 0 : padding;
+    std::size_t offset_back = (ipu == options.num_ipus - 1) ? padding : 1;
     auto ipu_slice = a.slice(
       {
         0, 
         0, 
-        block_low(ipu, options.num_ipus, options.depth-2) + offset_front
+        block_low(ipu, options.num_ipus, options.depth-padding) + offset_front
       },
       {
         options.height, 
         options.width, 
-        block_high(ipu, options.num_ipus, options.depth-2) + offset_back
+        block_high(ipu, options.num_ipus, options.depth-padding) + offset_back
       }
     );
 

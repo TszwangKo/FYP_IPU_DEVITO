@@ -31,6 +31,7 @@ namespace utils {
     std::size_t height;
     std::size_t width;
     std::size_t depth;
+    std::size_t padding;
     std::string vertex;
     bool cpu;
     // Not command line arguments
@@ -74,6 +75,11 @@ namespace utils {
       "depth",
       po::value<std::size_t>(&options.depth)->default_value(10),
       "Depth of a custom 3D grid"
+    )
+    (
+      "padding",
+      po::value<std::size_t>(&options.padding)->default_value(2),
+      "Padding of elements around calculation."
     )
     (
       "alpha",
@@ -226,7 +232,9 @@ std::vector<float> WaveEquationCpu(
   unsigned h = options.height;
   unsigned w = options.width;
   unsigned d = options.depth;
+  unsigned padding = options.padding;
   unsigned iter = options.num_iterations;
+  
   std::vector<float> a(initial_values.size());
   std::vector<float> b(initial_values.size());
 
@@ -238,10 +246,10 @@ std::vector<float> WaveEquationCpu(
 
   // Wave Equation iterations
   for (std::size_t t = 0; t < iter; ++t) {
-    for (std::size_t x = 2; x < h - 2; ++x) {
-      for (std::size_t y = 2; y < w - 2; ++y) { 
-        for (std::size_t z = 2; z < d - 2; ++z) {
-            const float r4 = -2.5f * b[index(x,y,z,w,d)];
+    for (std::size_t x = padding; x < h - padding; ++x) {
+      for (std::size_t y = padding; y < w - padding; ++y) { 
+        for (std::size_t z = padding; z < d - padding; ++z) {
+            // const float r4 = -2.5f * b[index(x,y,z,w,d)];
             a[index(x,y,z,w,d)] = b[index(x,y,z,w,d)] + damp[index(x,y,z,w,d)] + vp[index(x,y,z,w,d)];
             // a[index(x,y,z,w,d)] = dt * ( options.alpha * ( 
             //                             r1 * ( r4 -
@@ -263,9 +271,9 @@ std::vector<float> WaveEquationCpu(
       }
     }
       
-    for (std::size_t x = 2; x < h - 2 ; ++x) {
-      for (std::size_t y = 2; y < w - 2 ; ++y) { 
-        for (std::size_t z = 2; z < d - 2 ; ++z) {
+    for (std::size_t x = padding; x < h - padding ; ++x) {
+      for (std::size_t y = padding; y < w - padding ; ++y) { 
+        for (std::size_t z = padding; z < d - padding ; ++z) {
           b[index(x,y,z,w,d)] = a[index(x,y,z,w,d)];
         }
       }
@@ -285,9 +293,10 @@ void printMeanSquaredError(
   std::size_t h = options.height;
   std::size_t w = options.width;
   std::size_t d = options.depth;
-  for (std::size_t x = 2; x < h - 2; ++x) {
-    for (std::size_t y = 2; y < w - 2; ++y) { 
-      for (std::size_t z = 2; z < d - 2; ++z) {
+  std::size_t padding = options.padding;
+  for (std::size_t x = padding; x < h - padding; ++x) {
+    for (std::size_t y = padding; y < w - padding; ++y) { 
+      for (std::size_t z = padding; z < d - padding; ++z) {
         diff = double(a[index(x,y,z,w,d)] - b[index(x,y,z,w,d)]);
         squared_error += diff*diff;
         if( diff!= 0 ){

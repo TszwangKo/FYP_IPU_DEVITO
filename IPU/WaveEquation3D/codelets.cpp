@@ -14,6 +14,7 @@ public:
   const unsigned worker_height;
   const unsigned worker_width;
   const unsigned worker_depth;
+  const unsigned padding;
   const float alpha;
 
   unsigned idx(unsigned x, unsigned y, unsigned w)
@@ -35,16 +36,16 @@ public:
     const float r2 = 1.0F / (hy * hy);
     const float r3 = 1.0F / (hz * hz);
 
-    for (std::size_t x = 2; x < worker_height + 2; ++x)
+    for (std::size_t x = padding; x < worker_height + padding; ++x)
     {
-      for (std::size_t y = 2; y < worker_width + 2; ++y)
+      for (std::size_t y = padding; y < worker_width + padding; ++y)
       {
-        for (std::size_t z = 2; z < worker_depth + 2; ++z)
+        for (std::size_t z = padding; z < worker_depth + padding; ++z)
         {
 
-          const unsigned padded_width = worker_width + 4;
-          const float r4 = -2.5F * in[idx(x, y, padded_width)][z];
-          out[idx(x-2,y-2,worker_width)][z-2] = in[idx(x,y,padded_width)][z] + damp[idx(x,y,padded_width)][z] +  vp[idx(x,y,padded_width)][z];
+          const unsigned padded_width = worker_width + 2*padding;
+          // const float r4 = -2.5F * in[idx(x, y, padded_width)][z];
+          out[idx(x-padding,y-padding,worker_width)][z-padding] = in[idx(x,y,padded_width)][z] + damp[idx(x,y,padded_width)][z] +  vp[idx(x,y,padded_width)][z];
           // out[idx(x - 2, y - 2, worker_width)][z - 2] = dt * (alpha * ( r1 * (r4 -
           //                                                                    8.33333333e-2F * (in[idx(x - 2, y, padded_width)][z] + in[idx(x + 2, y, padded_width)][z]) +
           //                                                                    1.33333333F * (in[idx(x - 1, y, padded_width)][z] + in[idx(x + 1, y, padded_width)][z])) +
