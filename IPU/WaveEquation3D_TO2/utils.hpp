@@ -206,6 +206,7 @@ void printIfNan(float number, std::string message) {
     if( isnan(number) )
         std::cout << "number" << message << std::endl;
 }
+
 std::vector<float> WaveEquationCpu(
   const std::vector<float> initial_values,
   const std::vector<float> damp, 
@@ -234,11 +235,13 @@ std::vector<float> WaveEquationCpu(
   
   std::vector<float> a(initial_values.size());
   std::vector<float> b(initial_values.size());
+  std::vector<float> c(initial_values.size());
 
-  // initial copy to include edges
+  // initialise vectors (including edges)
   for (std::size_t i = 0; i < initial_values.size(); ++i)  {
     a[i] = initial_values[i]; 
     b[i] = initial_values[i]; 
+    c[i] = initial_values[i]; 
   }
 
   // Wave Equation iterations
@@ -246,15 +249,16 @@ std::vector<float> WaveEquationCpu(
     for (std::size_t x = padding; x < h - padding; ++x) {
       for (std::size_t y = padding; y < w - padding; ++y) { 
         for (std::size_t z = padding; z < d - padding; ++z) {
-            float r1 = 1.0F/(vp[index(x,y,z,w,d)]*vp[index(x,y,z,w,d)]);
-            // a[index(x,y,z,w,d)] = b[index(x,y,z,w,d)] + damp[index(x,y,z,w,d)] + vp[index(x,y,z,w,d)];
-            a[index(x,y,z,w,d)] = (
-                          r0*damp[index(x-3,y-3,z-3,w,d)]*b[index(x,y,z,w,d)] + 
-                          r1*(r0*b[index(x,y,z,w,d)]) + 
-                          8.33333315e-4F*(-b[index(x-2,y,z,w,d)] - b[index(x,y-2,z,w,d)] - b[index(x,y,z-2,w,d)] - b[index(x,y,z+2,w,d)] - b[index(x,y+2,z,w,d)] - b[index(x+2,y,z,w,d)]) + 
-                          1.3333333e-2F*(b[index(x-1,y,z,w,d)] + b[index(x,y-1,z,w,d)] + b[index(x,y,z-1,w,d)] + b[index(x,y,z+1,w,d)] + b[index(x,y+1,z,w,d)] + b[index(x+1,y,z,w,d)]) - 
-                          7.49999983e-2F*b[index(x,y,z,w,d)]
-                        )/(r0*r1 + r0*damp[index(x-3,y-3,z-3,w,d)]);
+            a[index(x,y,z,w,d)] = b[index(x,y,z,w,d)] + c[index(x,y,z,w,d)];
+            // float r1 = 1.0F/(vp[index(x,y,z,w,d)]*vp[index(x,y,z,w,d)]);
+
+            // a[index(x,y,z,w,d)] = (
+            //               r0*damp[index(x-3,y-3,z-3,w,d)]*b[index(x,y,z,w,d)] + 
+            //               r1*(r0*b[index(x,y,z,w,d)]) + 
+            //               8.33333315e-4F*(-b[index(x-2,y,z,w,d)] - b[index(x,y-2,z,w,d)] - b[index(x,y,z-2,w,d)] - b[index(x,y,z+2,w,d)] - b[index(x,y+2,z,w,d)] - b[index(x+2,y,z,w,d)]) + 
+            //               1.3333333e-2F*(b[index(x-1,y,z,w,d)] + b[index(x,y-1,z,w,d)] + b[index(x,y,z-1,w,d)] + b[index(x,y,z+1,w,d)] + b[index(x,y+1,z,w,d)] + b[index(x+1,y,z,w,d)]) - 
+            //               7.49999983e-2F*b[index(x,y,z,w,d)]
+            //             )/(r0*r1 + r0*damp[index(x-3,y-3,z-3,w,d)]);
         }
       }
     }
@@ -262,6 +266,7 @@ std::vector<float> WaveEquationCpu(
     for (std::size_t x = padding; x < h - padding ; ++x) {
       for (std::size_t y = padding; y < w - padding ; ++y) { 
         for (std::size_t z = padding; z < d - padding ; ++z) {
+          c[index(x,y,z,w,d)] = b[index(x,y,z,w,d)];
           b[index(x,y,z,w,d)] = a[index(x,y,z,w,d)];
         }
       }
@@ -287,10 +292,10 @@ void printMeanSquaredError(
       for (std::size_t z = padding; z < d - padding; ++z) {
         diff = double(a[index(x,y,z,w,d)] - b[index(x,y,z,w,d)]);
         squared_error += diff*diff;
-        if( diff!= 0 ){
-            std::cout << "ipu: " << a[index(x,y,z,w,d)] << std::endl;
-            std::cout << "cpu: " << b[index(x,y,z,w,d)] << std::endl;
-        }
+        // if( diff!= 0 ){
+        //     std::cout << "ipu: " << a[index(x,y,z,w,d)] << std::endl;
+        //     std::cout << "cpu: " << b[index(x,y,z,w,d)] << std::endl;
+        // }
       }
     }
   }
@@ -336,7 +341,7 @@ void printNorms(
   std::size_t d = options.depth;
     
   
-  std::cout << "IPU RESULT:" << std::endl;
+  std::cout << "Norms:" << std::endl;
   for (std::size_t x = 0; x < h ; ++x) {
     for (std::size_t y = 0; y < w ; ++y) { 
       for (std::size_t z = 0; z < d ; ++z) {

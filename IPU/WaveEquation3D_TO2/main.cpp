@@ -17,7 +17,8 @@ Variables: underscore_separated_words
 
 poplar::ComputeSet createComputeSet(
   poplar::Graph &graph,
-  poplar::Tensor &in,
+  poplar::Tensor &in1,
+  poplar::Tensor &in2,
   poplar::Tensor &out,
   poplar::Tensor &damp,
   poplar::Tensor &vp,
@@ -43,7 +44,17 @@ poplar::ComputeSet createComputeSet(
   
     // Ensure overlapping grids among the IPUs
     std::size_t offset_back = 2*padding;
-    auto ipu_in_slice = in.slice(
+    auto ipu_in1_slice = in1.slice(
+      {0, 0, block_low(ipu, options.num_ipus, options.depth-offset_back)},
+      {options.height, options.width, block_high(ipu, options.num_ipus, options.depth-offset_back) + offset_back}
+    );
+
+    auto ipu_in2_slice = in2.slice(
+      {0, 0, block_low(ipu, options.num_ipus, options.depth-offset_back)},
+      {options.height, options.width, block_high(ipu, options.num_ipus, options.depth-offset_back) + offset_back}
+    );
+
+    auto ipu_out_slice = out.slice(
       {0, 0, block_low(ipu, options.num_ipus, options.depth-offset_back)},
       {options.height, options.width, block_high(ipu, options.num_ipus, options.depth-offset_back) + offset_back}
     );
@@ -58,13 +69,8 @@ poplar::ComputeSet createComputeSet(
       {options.height, options.width, block_high(ipu, options.num_ipus, options.depth-offset_back) + offset_back}
     );
 
-    auto ipu_out_slice = out.slice(
-      {0, 0, block_low(ipu, options.num_ipus, options.depth-offset_back)},
-      {options.height, options.width, block_high(ipu, options.num_ipus, options.depth-offset_back) + offset_back}
-    );
-    std::size_t inter_depth = ipu_in_slice.shape()[2];
+    std::size_t inter_depth = ipu_in1_slice.shape()[2];
     
-      
     // Iterate through Tiles
     for (std::size_t x = 0; x < nh; ++x) {
       for (std::size_t y = 0; y < nw; ++y) {
@@ -113,7 +119,12 @@ poplar::ComputeSet createComputeSet(
               unsigned y_high = tile_y + block_high(worker_yi, nww, tile_width);    // high y-coordinate within the ipu
 
               // NOTE: include overlap for "in_slice"
-              auto in_slice = ipu_in_slice.slice(
+              auto in1_slice = ipu_in1_slice.slice(
+                {x_low-padding, y_low-padding, z_low-padding},
+                {x_high+padding, y_high+padding, z_high+padding}
+              );
+
+              auto in2_slice = ipu_in2_slice.slice(
                 {x_low-padding, y_low-padding, z_low-padding},
                 {x_high+padding, y_high+padding, z_high+padding}
               );
@@ -135,7 +146,8 @@ poplar::ComputeSet createComputeSet(
 
               // Assign vertex to graph
               auto v = graph.addVertex(compute_set, options.vertex);
-              graph.connect(v["in"], in_slice.flatten(0,2));
+              graph.connect(v["in1"], in1_slice.flatten(0,2));
+              graph.connect(v["in2"], in2_slice.flatten(0,2));
               graph.connect(v["damp"], damp_slice.flatten(0,2));
               graph.connect(v["vp"], vp_slice.flatten(0,2));
               graph.connect(v["out"], out_slice.flatten(0,2));
@@ -162,6 +174,7 @@ std::vector<poplar::program::Program> createIpuPrograms(
   // Allocate Tensors, device variables
   auto a = graph.addVariable(poplar::FLOAT, {options.height, options.width, options.depth}, "a");
   auto b = graph.addVariable(poplar::FLOAT, {options.height, options.width, options.depth}, "b");
+  auto c = graph.addVariable(poplar::FLOAT, {options.height, options.width, options.depth}, "c");
   auto damp = graph.addConstant(poplar::FLOAT, {options.height, options.width, options.depth}, damp_coef.data() , "damp"); 
   auto vp = graph.addConstant(poplar::FLOAT, {options.height, options.width, options.depth}, vp_coef.data() , "vp"); 
   
@@ -221,9 +234,10 @@ std::vector<poplar::program::Program> createIpuPrograms(
     }
   }
 
-  // Apply the tile mapping of "a" to be the same for "b"
+  // Apply the tile mapping of "a" to be the same for "b" "c" and other coefficients
   const auto& tile_mapping = graph.getTileMapping(a);
   graph.setTileMapping(b, tile_mapping);
+  graph.setTileMapping(c, tile_mapping);
   graph.setTileMapping(damp, tile_mapping);
   graph.setTileMapping(vp, tile_mapping);
 
@@ -241,31 +255,38 @@ std::vector<poplar::program::Program> createIpuPrograms(
     poplar::program::Sequence{
       poplar::program::Copy(host_to_device, b), // initial_values to b
       poplar::program::Copy(b, a), // initial_values to a
+      poplar::program::Copy(b, c), // initial_values to c
     }
   );
 
-  // Create compute sets
-  auto compute_set_b_to_a = createComputeSet(graph, b, a, damp, vp, options, "WaveEquation_b_to_a");
-  auto compute_set_a_to_b = createComputeSet(graph, a, b, damp, vp, options, "WaveEquation_a_to_b");
+  //* Create compute sets (2nd Time order requires 3 compute sets)
+  auto compute_set_bc_to_a = createComputeSet(graph, b, c, a, damp, vp, options, "WaveEquation_bc_to_a");
+  auto compute_set_ca_to_b = createComputeSet(graph, c, a, b, damp, vp, options, "WaveEquation_ca_to_b");
+  auto compute_set_ab_to_c = createComputeSet(graph, a, b, c, damp, vp, options, "WaveEquation_ab_to_c");
   poplar::program::Sequence execute_this_compute_set;
 
-  if (options.num_iterations % 2 == 1) { // if num_iterations is odd: add one extra iteration
-    execute_this_compute_set.add(poplar::program::Execute(compute_set_a_to_b));
+  // Add extra iteration when iteration is not multiple of 3
+  if (options.num_iterations % 3 == 1) { // if num_iterations % 3 = 1: add one extra iteration
+    execute_this_compute_set.add(poplar::program::Execute(compute_set_ab_to_c));
+  } else if (options.num_iterations % 3 == 2) { // if num_iterations % 3 = 2: add two extra iteration
+    execute_this_compute_set.add(poplar::program::Execute(compute_set_ca_to_b));
+    execute_this_compute_set.add(poplar::program::Execute(compute_set_ab_to_c));
   }
 
   // add iterations 
   execute_this_compute_set.add(
     poplar::program::Repeat(
-      options.num_iterations/2,
+      options.num_iterations/3, 
       poplar::program::Sequence{
-        poplar::program::Execute(compute_set_b_to_a),
-        poplar::program::Execute(compute_set_a_to_b)
+        poplar::program::Execute(compute_set_bc_to_a),
+        poplar::program::Execute(compute_set_ca_to_b),
+        poplar::program::Execute(compute_set_ab_to_c),
       }
     )
   );
 
   programs.push_back(execute_this_compute_set);
-  programs.push_back(poplar::program::Copy(b, device_to_host));
+  programs.push_back(poplar::program::Copy(c, device_to_host));
 
   return programs;
 }
@@ -328,12 +349,12 @@ int main (int argc, char** argv) {
     // for (std::size_t i = total_volume/2; i < total_volume; ++i)
     //   initial_values[i] = 2.0f ;//randomFloat();
     for (std::size_t i = 0; i < total_volume; ++i)
-      initial_values[i] = float(i*100000000) ;//randomFloat();
+      initial_values[i] = 1.0f ;//randomFloat();
 
       
     for (std::size_t i = 0; i < total_volume; i ++ ){
-      damp_coef[i] = randomFloat()*1000;
-      vp_coef[i] = randomFloat()*1000;
+      damp_coef[i] = 1.0f;
+      vp_coef[i] = 2.0f;
     }
   
     // perform CPU execution (and later compute MSE in IPU vs. CPU execution)
@@ -361,7 +382,8 @@ int main (int argc, char** argv) {
     printResults(options, wall_time);
 
     if (options.cpu) { 
-        printMatrix(ipu_results,options);
+        printMatrix(cpu_results,options);
+        // printMatrix(ipu_results,options);
         printNorms(ipu_results, cpu_results, options);
         printMeanSquaredError(ipu_results, cpu_results, options);
     }
