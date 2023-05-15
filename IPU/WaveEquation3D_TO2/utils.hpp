@@ -224,7 +224,8 @@ std::vector<float> WaveEquationCpu(
   const float hz = 0.2f;
   const float dt = 0.25f * hx * hy * hz / 0.5f;
 
-  const float r0 = 1.0f/dt;
+  const float r0 = 1.0f/(dt*dt);
+  const float r1 = 1.0f/dt;
  
 
   unsigned h = options.height;
@@ -243,22 +244,22 @@ std::vector<float> WaveEquationCpu(
     b[i] = initial_values[i]; 
     c[i] = initial_values[i]; 
   }
-
+  auto& t0 = c;
+  auto& t1 = b;
+  auto& t2 = a;
   // Wave Equation iterations
   for (std::size_t t = 0; t < iter; ++t) {
     for (std::size_t x = padding; x < h - padding; ++x) {
       for (std::size_t y = padding; y < w - padding; ++y) { 
         for (std::size_t z = padding; z < d - padding; ++z) {
-            a[index(x,y,z,w,d)] = b[index(x,y,z,w,d)] + c[index(x,y,z,w,d)];
-            // float r1 = 1.0F/(vp[index(x,y,z,w,d)]*vp[index(x,y,z,w,d)]);
-
-            // a[index(x,y,z,w,d)] = (
-            //               r0*damp[index(x-3,y-3,z-3,w,d)]*b[index(x,y,z,w,d)] + 
-            //               r1*(r0*b[index(x,y,z,w,d)]) + 
-            //               8.33333315e-4F*(-b[index(x-2,y,z,w,d)] - b[index(x,y-2,z,w,d)] - b[index(x,y,z-2,w,d)] - b[index(x,y,z+2,w,d)] - b[index(x,y+2,z,w,d)] - b[index(x+2,y,z,w,d)]) + 
-            //               1.3333333e-2F*(b[index(x-1,y,z,w,d)] + b[index(x,y-1,z,w,d)] + b[index(x,y,z-1,w,d)] + b[index(x,y,z+1,w,d)] + b[index(x,y+1,z,w,d)] + b[index(x+1,y,z,w,d)]) - 
-            //               7.49999983e-2F*b[index(x,y,z,w,d)]
-            //             )/(r0*r1 + r0*damp[index(x-3,y-3,z-3,w,d)]);
+            // a[index(x,y,z,w,d)] = b[index(x,y,z,w,d)] + c[index(x,y,z,w,d)];
+            float r2 = 1.0F/(vp[index(x,y,z,w,d)]*vp[index(x,y,z,w,d)]);
+            t2[index(x,y,z,w,d)] = (  r1*damp[index(x-3,y-3,z-3,w,d)]*t0[index(x,y,z,w,d)] + 
+                                            2*(-r0*(-2.0F*t0[index(x,y,z,w,d)]) - r0*t1[index(x,y,z,w,d)]) + 
+                                            8.33333315e-4F*(-t0[index(x-2,y,z,w,d)] - t0[index(x,y-2,z,w,d)] - t0[index(x,y,z-2,w,d)] - t0[index(x,y,z+2,w,d)] - t0[index(x,y+2,z,w,d)] - t0[index(x+2,y,z,w,d)]) + 
+                                            1.3333333e-2F*(t0[index(x-1,y,z,w,d)] + t0[index(x,y-1,z,w,d)] + t0[index(x,y,z-1,w,d)] + t0[index(x,y,z+1,w,d)] + t0[index(x,y+1,z,w,d)] + t0[index(x+1,y,z,w,d)]) - 
+                                            7.49999983e-2F*t0[index(x,y,z,w,d)]
+                                          )/(r0*r2 + r1*damp[index(x-3,y-3,z-3,w,d)]);
         }
       }
     }
