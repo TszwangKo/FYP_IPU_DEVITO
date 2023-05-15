@@ -11,7 +11,7 @@ $ ./main
 
 Additionally, command line arguments can be provided:
 ```
-$ ./main --height 400 --width 400 --depth 400 --num-ipus 2 --num-iterations 1000 --alpha 0.1 --cpu --vertex HeatEquationOptimized
+$ ./main --height 400 --width 400 --depth 400 --num-ipus 2 --num-iterations 1000 --alpha 0.1 --cpu --vertex DiffusionEquationSimple
 ```
 * `--height`, `--width`, and `--depth` corresponds to the mesh to be used.
 * `--num-ipus` specifies how many IPUs to perform the computations on.

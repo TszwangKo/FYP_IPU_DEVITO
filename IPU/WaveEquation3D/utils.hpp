@@ -57,32 +57,32 @@ namespace utils {
     )
     (
       "num-iterations",
-      po::value<unsigned>(&options.num_iterations)->default_value(100000),
+      po::value<unsigned>(&options.num_iterations)->default_value(10),
       "PDE: number of iterations to execute on grid."
     )
     (
       "height",
-      po::value<std::size_t>(&options.height)->default_value(0),
+      po::value<std::size_t>(&options.height)->default_value(10),
       "Heigth of a custom 3D grid"
     )
     (
       "width",
-      po::value<std::size_t>(&options.width)->default_value(0), 
+      po::value<std::size_t>(&options.width)->default_value(10), 
       "Width of a custom 3D grid"
     )
     (
       "depth",
-      po::value<std::size_t>(&options.depth)->default_value(0),
+      po::value<std::size_t>(&options.depth)->default_value(10),
       "Depth of a custom 3D grid"
     )
     (
       "alpha",
-      po::value<float>(&options.alpha)->default_value(0.1),
+      po::value<float>(&options.alpha)->default_value(0.5),
       "PDE: update step size given as a float."
     )
     (
       "vertex",
-      po::value<std::string>(&options.vertex)->default_value("HeatEquationOptimized"),
+      po::value<std::string>(&options.vertex)->default_value("WaveEquationSimple"),
       "Name of vertex (from codelets.cpp) to use for the computation."
     )
     (
@@ -134,11 +134,6 @@ inline static unsigned index(unsigned x, unsigned y, unsigned z, unsigned width,
   return (z) + (y)*(depth) + (x)*(width)*(depth);
 }
 
-/*
-    id - x * y 
-    p  - ipu no
-    n  - total number of ipu
-*/
 inline static unsigned block_low(unsigned id, unsigned p, unsigned n) {
   return (id*n)/p; 
 }
@@ -201,8 +196,14 @@ void workDivision(utils::Options &options) {
   }
 }
 
-std::vector<float> heatEquationCpu(
-  const std::vector<float> initial_values, 
+void printIfNan(float number, std::string message) {
+    if( isnan(number) )
+        std::cout << "number" << message << std::endl;
+}
+std::vector<float> WaveEquationCpu(
+  const std::vector<float> initial_values,
+  const std::vector<float> damp, 
+  const std::vector<float> vp, 
   const utils::Options &options) {
   /*
    * Heat Equation Vertex, computed on the CPU, unparallelized.
@@ -211,6 +212,17 @@ std::vector<float> heatEquationCpu(
    * NOTE: can be very slow for large grids/large number of iterations
    */
   const float beta = 1.0 - 6.0*options.alpha;
+    
+  const float hx = 0.2f;
+  const float hy = 0.2f;
+  const float hz = 0.2f;
+  const float dt = 0.25f * hx * hy * hz / 0.5f;
+
+  const float r0 = 1/dt;
+  const float r1 = 1/(hx*hx);
+  const float r2 = 1/(hy*hy);
+  const float r3 = 1/(hz*hz);
+
   unsigned h = options.height;
   unsigned w = options.width;
   unsigned d = options.depth;
@@ -224,26 +236,36 @@ std::vector<float> heatEquationCpu(
     b[i] = initial_values[i]; 
   }
 
-  // Heat Equation iterations
+  // Wave Equation iterations
   for (std::size_t t = 0; t < iter; ++t) {
-    for (std::size_t x = 1; x < h - 1; ++x) {
-      for (std::size_t y = 1; y < w - 1; ++y) { 
-        for (std::size_t z = 1; z < d - 1; ++z) {
-          a[index(x,y,z,w,d)] = beta*b[index(x,y,z,w,d)] +
-            options.alpha*(
-              b[index(x+1,y,z,w,d)] +
-              b[index(x-1,y,z,w,d)] +
-              b[index(x,y+1,z,w,d)] +
-              b[index(x,y-1,z,w,d)] +
-              b[index(x,y,z+1,w,d)] +
-              b[index(x,y,z-1,w,d)]
-            );
+    for (std::size_t x = 2; x < h - 2; ++x) {
+      for (std::size_t y = 2; y < w - 2; ++y) { 
+        for (std::size_t z = 2; z < d - 2; ++z) {
+            const float r4 = -2.5f * b[index(x,y,z,w,d)];
+            a[index(x,y,z,w,d)] = b[index(x,y,z,w,d)] + damp[index(x,y,z,w,d)] + vp[index(x,y,z,w,d)];
+            // a[index(x,y,z,w,d)] = dt * ( options.alpha * ( 
+            //                             r1 * ( r4 -
+            //                                   8.33333333e-2F * ( b[index(x-2,y,z,w,d)] + b[index(x+2,y,z,w,d)] ) +
+            //                                   1.33333333F * ( b[index(x-1,y,z,w,d)] + b[index(x+1,y,z,w,d)] ) 
+            //                                  ) +
+            //                             r2 * ( r4 -
+            //                                   8.33333333e-2F * ( b[index(x,y-2,z,w,d)] + b[index(x,y+2,z,w,d)] ) +
+            //                                   1.33333333F * ( b[index(x,y-1,z,w,d)] + b[index(x,y+1,z,w,d)] ) 
+            //                                  )+
+            //                             r3 * ( r4 -
+            //                                   8.33333333e-2F * (b[index(x,y,z-2,w,d)] + b[index(x,y,z+2,w,d)] ) +
+            //                                   1.33333333F * (b[index(x,y,z-1,w,d)] + b[index(x,y,z+1,w,d)]) 
+            //                                  )
+            //                         ) +
+            //                             r0 * b[index(x,y,z,w,d)]
+            //                       );
         }
       }
     }
-    for (std::size_t x = 1; x < h - 1; ++x) {
-      for (std::size_t y = 1; y < w - 1; ++y) { 
-        for (std::size_t z = 1; z < d - 1; ++z) {
+      
+    for (std::size_t x = 2; x < h - 2 ; ++x) {
+      for (std::size_t y = 2; y < w - 2 ; ++y) { 
+        for (std::size_t z = 2; z < d - 2 ; ++z) {
           b[index(x,y,z,w,d)] = a[index(x,y,z,w,d)];
         }
       }
@@ -263,20 +285,72 @@ void printMeanSquaredError(
   std::size_t h = options.height;
   std::size_t w = options.width;
   std::size_t d = options.depth;
-  for (std::size_t x = 1; x < h - 1; ++x) {
-    for (std::size_t y = 1; y < w - 1; ++y) { 
-      for (std::size_t z = 1; z < d - 1; ++z) {
+  for (std::size_t x = 2; x < h - 2; ++x) {
+    for (std::size_t y = 2; y < w - 2; ++y) { 
+      for (std::size_t z = 2; z < d - 2; ++z) {
         diff = double(a[index(x,y,z,w,d)] - b[index(x,y,z,w,d)]);
         squared_error += diff*diff;
+        if( diff!= 0 ){
+            std::cout << "ipu: " << a[index(x,y,z,w,d)] << std::endl;
+            std::cout << "cpu: " << b[index(x,y,z,w,d)] << std::endl;
+        }
       }
     }
   }
-  double mean_squared_error = squared_error / (double) ((h-2)*(w-2)*(d-2));
+  double mean_squared_error = squared_error / (double) ((h-4)*(w-4)*(d-4));
 
   std::cout << "\nMean Squared Error (IPU vs. CPU) = " << mean_squared_error;
-  if (mean_squared_error == double(0.0)) 
+  if (mean_squared_error == double(0.0)) {
     std::cout << " (exactly)";
+  }
   std::cout << "\n";
+}
+
+void printMatrix (
+  std::vector<float> matrix, 
+  utils::Options &options) {
+  double norm = 0;
+  std::size_t h = options.height;
+  std::size_t w = options.width;
+  std::size_t d = options.depth;
+    
+  std::cout << "IPU RESULT:" << std::endl;
+  for (std::size_t x = 0; x < h ; ++x) {
+    std::cout << "x = " << x << std::endl << std::endl;
+    for (std::size_t y = 0; y < w ; ++y) { 
+        std::cout << '\t';
+      for (std::size_t z = 0; z < d ; ++z) {
+            std::cout << matrix[index(x,y,z,w,d)] << ' ';
+            norm += matrix[index(x,y,z,w,d)];
+      }
+        std::cout << std::endl;
+    }
+    std::cout << std::endl << std::endl;
+  }
+}
+
+void printNorms(
+  std::vector<float> a, 
+  std::vector<float> b, 
+  utils::Options &options) {
+  double normIpu = 0, normCpu = 0;
+  std::size_t h = options.height;
+  std::size_t w = options.width;
+  std::size_t d = options.depth;
+    
+  
+  std::cout << "IPU RESULT:" << std::endl;
+  for (std::size_t x = 0; x < h ; ++x) {
+    for (std::size_t y = 0; y < w ; ++y) { 
+      for (std::size_t z = 0; z < d ; ++z) {
+            normIpu += a[index(x,y,z,w,d)];
+            normCpu += b[index(x,y,z,w,d)];
+      }
+    }
+  }
+    std::cout << std::endl;
+    std::cout << "\n IPU L2 Norm =" << normIpu << std::endl;
+    std::cout << "\n CPU L2 Norm =" << normCpu << std::endl;
 }
 
 void printResults(utils::Options &options, double wall_time) {

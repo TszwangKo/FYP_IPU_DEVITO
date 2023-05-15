@@ -6,6 +6,7 @@
 
 #include <poplar/DeviceManager.hpp>
 #include <poplar/Engine.hpp>
+#include <poplar/ArrayRef.hpp>
 
 #include "utils.hpp"
 
@@ -18,6 +19,8 @@ poplar::ComputeSet createComputeSet(
   poplar::Graph &graph,
   poplar::Tensor &in,
   poplar::Tensor &out,
+  poplar::Tensor &damp,
+  poplar::Tensor &vp,
   utils::Options &options,
   const std::string& compute_set_name) {
   /*
@@ -35,21 +38,30 @@ poplar::ComputeSet createComputeSet(
 
   for (std::size_t ipu = 0; ipu < options.num_ipus; ++ipu) {
       
-    //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! v Whole mechanism used to allocated memories to IPU with overlap v !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     // TODO: Make an inline function for this for various space order (amount of overlap between IPU)
-      
+  
     // Ensure overlapping grids among the IPUs
     std::size_t offset_back = 4;
     auto ipu_in_slice = in.slice(
       {0, 0, block_low(ipu, options.num_ipus, options.depth-offset_back)},
       {options.height, options.width, block_high(ipu, options.num_ipus, options.depth-offset_back) + offset_back}
     );
+
+    poplar::Tensor ipu_damp_slice = damp.slice(
+      {0, 0, block_low(ipu, options.num_ipus, options.depth-offset_back)},
+      {options.height, options.width, block_high(ipu, options.num_ipus, options.depth-offset_back) + offset_back}
+    );
+
+    poplar::Tensor ipu_vp_slice = vp.slice(
+      {0, 0, block_low(ipu, options.num_ipus, options.depth-offset_back)},
+      {options.height, options.width, block_high(ipu, options.num_ipus, options.depth-offset_back) + offset_back}
+    );
+
     auto ipu_out_slice = out.slice(
       {0, 0, block_low(ipu, options.num_ipus, options.depth-offset_back)},
       {options.height, options.width, block_high(ipu, options.num_ipus, options.depth-offset_back) + offset_back}
     );
     std::size_t inter_depth = ipu_in_slice.shape()[2];
-    //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ^ why option.depth-2? why offset_back? why overlapping 2 layers instead of 1? ^ !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
       
     // Iterate through Tiles
@@ -105,6 +117,16 @@ poplar::ComputeSet createComputeSet(
                 {x_high+2, y_high+2, z_high+2}
               );
 
+              auto damp_slice = ipu_damp_slice.slice(
+                {x_low-2, y_low-2, z_low-2},
+                {x_high+2, y_high+2, z_high+2}
+              );
+
+              auto vp_slice = ipu_vp_slice.slice(
+                {x_low-2, y_low-2, z_low-2},
+                {x_high+2, y_high+2, z_high+2}
+              );
+
               auto out_slice = ipu_out_slice.slice(
                 {x_low, y_low, z_low},
                 {x_high, y_high, z_high}
@@ -113,6 +135,8 @@ poplar::ComputeSet createComputeSet(
               // Assign vertex to graph
               auto v = graph.addVertex(compute_set, options.vertex);
               graph.connect(v["in"], in_slice.flatten(0,2));
+              graph.connect(v["damp"], damp_slice.flatten(0,2));
+              graph.connect(v["vp"], vp_slice.flatten(0,2));
               graph.connect(v["out"], out_slice.flatten(0,2));
               graph.setInitialValue(v["worker_height"], x_high - x_low);
               graph.setInitialValue(v["worker_width"], y_high - y_low);
@@ -131,11 +155,13 @@ poplar::ComputeSet createComputeSet(
 }
 
 std::vector<poplar::program::Program> createIpuPrograms(
-  poplar::Graph &graph, utils::Options &options) { 
+  poplar::Graph &graph, utils::Options &options, std::vector<float> &damp_coef, std::vector<float> &vp_coef) { 
 
   // Allocate Tensors, device variables
   auto a = graph.addVariable(poplar::FLOAT, {options.height, options.width, options.depth}, "a");
   auto b = graph.addVariable(poplar::FLOAT, {options.height, options.width, options.depth}, "b");
+  auto damp = graph.addConstant(poplar::FLOAT, {options.height, options.width, options.depth}, damp_coef.data() , "damp"); 
+  auto vp = graph.addConstant(poplar::FLOAT, {options.height, options.width, options.depth}, vp_coef.data() , "vp"); 
   
   for (std::size_t ipu = 0; ipu < options.num_ipus; ++ipu) {
 
@@ -195,11 +221,15 @@ std::vector<poplar::program::Program> createIpuPrograms(
   // Apply the tile mapping of "a" to be the same for "b"
   const auto& tile_mapping = graph.getTileMapping(a);
   graph.setTileMapping(b, tile_mapping);
+  graph.setTileMapping(damp, tile_mapping);
+  graph.setTileMapping(vp, tile_mapping);
 
   // Define data streams
   std::size_t volume = options.height*options.width*options.depth;
   auto host_to_device = graph.addHostToDeviceFIFO("host_to_device_stream", poplar::FLOAT, volume);
   auto device_to_host = graph.addDeviceToHostFIFO("device_to_host_stream", poplar::FLOAT, volume);
+  
+  
 
   std::vector<poplar::program::Program> programs;
 
@@ -212,8 +242,8 @@ std::vector<poplar::program::Program> createIpuPrograms(
   );
 
   // Create compute sets
-  auto compute_set_b_to_a = createComputeSet(graph, b, a, options, "HeatEquation_b_to_a");
-  auto compute_set_a_to_b = createComputeSet(graph, a, b, options, "HeatEquation_a_to_b");
+  auto compute_set_b_to_a = createComputeSet(graph, b, a, damp, vp, options, "WaveEquation_b_to_a");
+  auto compute_set_a_to_b = createComputeSet(graph, a, b, damp, vp, options, "WaveEquation_a_to_b");
   poplar::program::Sequence execute_this_compute_set;
 
   if (options.num_iterations % 2 == 1) { // if num_iterations is odd: add one extra iteration
@@ -279,27 +309,33 @@ int main (int argc, char** argv) {
 
     // Create graph object
     poplar::Graph graph{target};
-    graph.addCodelets("codelets_diffusion.cpp");
+    graph.addCodelets("codelets.gp");
     
     std::size_t inner_volume = (options.height - 2) * (options.width - 2) * (options.depth - 2);
     std::size_t total_volume = (options.height * options.width * options.depth);
     std::vector<float> ipu_results(total_volume); 
     std::vector<float> initial_values(total_volume);
+    std::vector<float> damp_coef(total_volume); // damp coefficient
+    std::vector<float> vp_coef(total_volume); // velocity profile coefficient
     std::vector<float> cpu_results(total_volume);
 
     // initialize initial values with random floats
     for (std::size_t i = 0; i < total_volume/2; ++i)
       initial_values[i] = 1.0f ;//randomFloat();
     for (std::size_t i = total_volume/2; i < total_volume; ++i)
-      initial_values[i] = 2.0f ;//randomFloat();
+      initial_values[i] = 1.0f ;//randomFloat();
       
-
+    for (std::size_t i = 0; i < total_volume; i ++ ){
+      damp_coef[i] = float(i) ; //randomFloat();
+      vp_coef[i] = float(i);
+    }
+  
     // perform CPU execution (and later compute MSE in IPU vs. CPU execution)
     if (options.cpu) 
-      cpu_results = diffusionEquationCpu(initial_values, options);
+      cpu_results = WaveEquationCpu(initial_values, damp_coef, vp_coef, options);
     
     // Setup of programs, graph and engine
-    auto programs = createIpuPrograms(graph, options);
+    auto programs = createIpuPrograms(graph, options, damp_coef, vp_coef);
     auto exe = poplar::compileGraph(graph, programs);
     poplar::Engine engine(std::move(exe));
     engine.connectStream("host_to_device_stream", &initial_values[0], &initial_values[total_volume]);
@@ -319,7 +355,8 @@ int main (int argc, char** argv) {
     printResults(options, wall_time);
 
     if (options.cpu) { 
-        printMatricesAndNorm(ipu_results, cpu_results, options);
+        // printMatrix(cpu_results,options);
+        printNorms(ipu_results, cpu_results, options);
         printMeanSquaredError(ipu_results, cpu_results, options);
     }
 

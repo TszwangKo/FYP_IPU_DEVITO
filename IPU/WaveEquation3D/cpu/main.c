@@ -44,7 +44,19 @@ int main (int argc, char** argv)
 	}
 
 	// beta reduces the stencil operation to only require 6 flops (instead of 7)
-	float beta = (1 - 6*alpha);
+	float beta = (1 - 6*alpha); 
+    
+    //!Constants
+    const float hx = 0.2f;
+    const float hy = 0.2f;
+    const float hz = 0.2f;
+    const float dt = 0.25f * hx * hy * hz / 0.5f;
+    
+    const float r0 = 1/dt;
+    const float r1 = 1/(hx*hx);
+    const float r2 = 1/(hy*hy);
+    const float r3 = 1/(hz*hz);
+    
 
 	// Allocate matrices
 	float ***tmp; // temporary pointer to perform pointer swaps
@@ -91,11 +103,20 @@ int main (int argc, char** argv)
 		// Perform heat equation
 		for (t = 0; t < num_iterations; ++t) {
 			#pragma omp for
-			for (i = 1; i < height - 1; ++i)
-				for (j = 1; j < width - 1; ++j)
-					for (k = 1; k < depth - 1; ++k)
-						b[i][j][k] = beta*a[i][j][k] + alpha*(
-							a[i+1][j][k] + a[i-1][j][k] + a[i][j+1][k] + a[i][j-1][k] + a[i][j][k+1] + a[i][j][k-1]);
+			for (i = 1; i < height - 1; ++i){
+				for (j = 1; j < width - 1; ++j){
+					for (k = 1; k < depth - 1; ++k){
+                        const float r4 = -2.0f/ a[i][j][k];
+                        b[i][j][k] = dt * ( alpha * ( 
+                                                            r1 * ( r4 + a[i-1][j][k] + a[i+1][j][k] ) +
+                                                            r2 * ( r4 + a[i][j-1][k] + a[i][j+1][k] ) +
+                                                            r3 * ( r4 + a[i][j][k-1] + a[i][j][k+1] )
+                                                            ) +
+                                                            r0 * a[i][j][k]
+                                                        );
+                    }
+                }
+            }
 			#pragma omp single
 			{
 				// pointer swap
