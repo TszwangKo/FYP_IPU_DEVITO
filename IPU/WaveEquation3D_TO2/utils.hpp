@@ -66,17 +66,17 @@ namespace utils {
     )
     (
       "height",
-      po::value<std::size_t>(&options.height)->default_value(11),
+      po::value<std::size_t>(&options.height)->default_value(31),
       "Heigth of a custom 3D grid"
     )
     (
       "width",
-      po::value<std::size_t>(&options.width)->default_value(11), 
+      po::value<std::size_t>(&options.width)->default_value(31), 
       "Width of a custom 3D grid"
     )
     (
       "depth",
-      po::value<std::size_t>(&options.depth)->default_value(11),
+      po::value<std::size_t>(&options.depth)->default_value(31),
       "Depth of a custom 3D grid"
     )
     (
@@ -260,10 +260,10 @@ std::vector<float> WaveEquationCpu(
     for (std::size_t x = padding; x < h - padding; ++x) {
       for (std::size_t y = padding; y < w - padding; ++y) { 
         for (std::size_t z = padding; z < d - padding; ++z) {
-            // a[index(x,y,z,w,d)] = b[index(x,y,z,w,d)] + c[index(x,y,z,w,d)];
+            // a[index(x,y,z,w,d)(x,y,z,w,d)] = b[index(x,y,z,w,d)] + c[index(x,y,z,w,d)];
             float r2 = 1.0F/(vp[index(x,y,z,w,d)]*vp[index(x,y,z,w,d)]);
             t2[index(x,y,z,w,d)] = (  r1*damp[index(x-3,y-3,z-3,w,d)]*t0[index(x,y,z,w,d)] + 
-                                            2*(-r0*(-2.0F*t0[index(x,y,z,w,d)]) - r0*t1[index(x,y,z,w,d)]) + 
+                                            r2*(-r0*(-2.0F*t0[index(x,y,z,w,d)]) - r0*t1[index(x,y,z,w,d)]) + 
                                             8.33333315e-4F*(-t0[index(x-2,y,z,w,d)] - t0[index(x,y-2,z,w,d)] - t0[index(x,y,z-2,w,d)] - t0[index(x,y,z+2,w,d)] - t0[index(x,y+2,z,w,d)] - t0[index(x+2,y,z,w,d)]) + 
                                             1.3333333e-2F*(t0[index(x-1,y,z,w,d)] + t0[index(x,y-1,z,w,d)] + t0[index(x,y,z-1,w,d)] + t0[index(x,y,z+1,w,d)] + t0[index(x,y+1,z,w,d)] + t0[index(x+1,y,z,w,d)]) - 
                                             7.49999983e-2F*t0[index(x,y,z,w,d)]
@@ -393,6 +393,13 @@ void printResults(utils::Options &options, double wall_time) {
     << std::setprecision(2) << tflops << " & " 
     << std::setprecision(2) << bandwidth_TB_s << " \\\\"
     << "\n";
+}
+
+std::vector<std::vector<std::vector<float>>> getDampValues(){
+    std::ifstream ifs("damp.json");
+    json jf = json::parse(ifs);
+
+    return jf.get<std::vector<std::vector<std::vector<float>>>>();
 }
 
 void printMultiIpuGridInfo(std::size_t base_length) {

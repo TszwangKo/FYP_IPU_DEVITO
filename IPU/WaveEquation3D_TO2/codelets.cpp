@@ -26,11 +26,7 @@ public:
 
   bool compute()
   {
-    const float beta{1.0f - 6.0f * alpha};
-    const float hx = 0.2f;
-    const float hy = 0.2f;
-    const float hz = 0.2f;
-    const float dt = 0.25f * hx * hy * hz / 0.5f;
+    const float dt = 3.019;
 
     const float r0 = 1.0f/(dt*dt);
     const float r1 = 1.0f/dt;
@@ -51,10 +47,12 @@ public:
           
           float r2 = 1.0F/(vp[idx(x,y,padded_width)][z]*vp[idx(x,y,padded_width)][z]);
           t2[idx(x-padding,y-padding,worker_width)][z-padding] = (  r1*damp[idx(x-3,y-3,padded_width)][z-3]*t0[idx(x,y,padded_width)][z] + 
-                                          2*(-r0*(-2.0F*t0[idx(x,y,padded_width)][z]) - r0*t1[idx(x,y,padded_width)][z]) + 
-                                          8.33333315e-4F*(-t0[idx(x-2,y,padded_width)][z] - t0[idx(x,y-2,padded_width)][z] - t0[idx(x,y,padded_width)][z-2] - t0[idx(x,y,padded_width)][z+2] - t0[idx(x,y+2,padded_width)][z] - t0[idx(x+2,y,padded_width)][z]) + 
-                                          1.3333333e-2F*(t0[idx(x-1,y,padded_width)][z] + t0[idx(x,y-1,padded_width)][z] + t0[idx(x,y,padded_width)][z-1] + t0[idx(x,y,padded_width)][z+1] + t0[idx(x,y+1,padded_width)][z] + t0[idx(x+1,y,padded_width)][z]) - 
-                                          7.49999983e-2F*t0[idx(x,y,padded_width)][z]
+                                          r2*(
+                                              -r0*(-2.0F*t0[idx(x,y,padded_width)][z]) - 
+                                              r0*t1[idx(x,y,padded_width)][z]) + 
+                                              8.33333315e-4F*(-t0[idx(x-2,y,padded_width)][z] - t0[idx(x,y-2,padded_width)][z] - t0[idx(x,y,padded_width)][z-2] - t0[idx(x,y,padded_width)][z+2] - t0[idx(x,y+2,padded_width)][z] - t0[idx(x+2,y,padded_width)][z]) + 
+                                              1.3333333e-2F*(t0[idx(x-1,y,padded_width)][z] + t0[idx(x,y-1,padded_width)][z] + t0[idx(x,y,padded_width)][z-1] + t0[idx(x,y,padded_width)][z+1] + t0[idx(x,y+1,padded_width)][z] + t0[idx(x+1,y,padded_width)][z]) - 
+                                              7.49999983e-2F*t0[idx(x,y,padded_width)][z]
                                         )/(r0*r2 + r1*damp[idx(x-3,y-3,padded_width)][z-3]);
         }
       }

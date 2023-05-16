@@ -351,13 +351,32 @@ int main (int argc, char** argv) {
     for (std::size_t i = 0; i < total_volume; ++i)
       initial_values[i] = 0.0f ;//randomFloat();
 
-    initial_values[options.width/2,options.depth/2,options.height/2] = 1.0f;  
+    initial_values[index(options.height/2,options.width/2,20,options.width,options.depth)] = 0.1f;  
       
     for (std::size_t i = 0; i < total_volume; i ++ ){
-      damp_coef[i] = 1.0f;
-      vp_coef[i] = 2.0f;
+      damp_coef[i] = randomFloat();
     }
+      
+    std::vector<std::vector<std::vector<float>>> original_damp = getDampValues();
   
+    for ( int x = 0; x < options.height ; x++ ){
+        for( int y = 0 ; y < options.width ; y++ ){
+            for (int z = 0 ; z < options.depth ; z++ ){
+                damp_coef[index(x,y,z,options.width,options.depth)] = original_damp[x][y][z];
+                if(z<options.depth/2) 
+                    vp_coef[index(x,y,z,options.width,options.depth)] = 1.5f;
+                else
+                    vp_coef[index(x,y,z,options.width,options.depth)] = 2.5f;
+            }
+        }
+    }
+    for ( auto& number : vp_coef){
+        if(number == 0.0f){
+            std::cout << "vp_coeff must not be 0!";
+            return -1;
+        }
+    }
+    
     // perform CPU execution (and later compute MSE in IPU vs. CPU execution)
     if (options.cpu) 
       cpu_results = WaveEquationCpu(initial_values, damp_coef, vp_coef, options);
