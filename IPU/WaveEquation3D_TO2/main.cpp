@@ -182,18 +182,18 @@ std::vector<poplar::program::Program> createIpuPrograms(
   for (std::size_t ipu = 0; ipu < options.num_ipus; ++ipu) {
 
     // Partition the entire grid FIRST among IPUs by splitting in depth (dimension 2)
-    std::size_t offset_front = (ipu == 0) ? 0 : padding;
-    std::size_t offset_back = (ipu == options.num_ipus - 1) ? padding : 1;
+    std::size_t offset_front = (ipu == 0) ? 0 : 1;
+    std::size_t offset_back = (ipu == options.num_ipus - 1) ? 2 : 1;
     auto ipu_slice = a.slice(
       {
         0, 
         0, 
-        block_low(ipu, options.num_ipus, options.depth-padding) + offset_front
+        block_low(ipu, options.num_ipus, options.depth-2) + offset_front
       },
       {
         options.height, 
         options.width, 
-        block_high(ipu, options.num_ipus, options.depth-padding) + offset_back
+        block_high(ipu, options.num_ipus, options.depth-2) + offset_back
       }
     );
 
@@ -380,10 +380,13 @@ int main (int argc, char** argv) {
     auto diff = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
     double wall_time = 1e-9*diff.count();
     printResults(options, wall_time);
-
+    
+    if (options.save_res)
+      printMatrix(ipu_results,options);
+    
     if (options.cpu) { 
         printMatrix(cpu_results,options);
-        // printMatrix(ipu_results,options);
+        //
         printNorms(ipu_results, cpu_results, options);
         printMeanSquaredError(ipu_results, cpu_results, options);
     }

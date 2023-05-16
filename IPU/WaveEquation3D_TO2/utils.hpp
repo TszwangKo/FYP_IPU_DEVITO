@@ -2,6 +2,7 @@
 #include <boost/program_options.hpp>
 #include <string>
 #include <iostream>
+#include <fstream>
 #include <iomanip>
 #include <math.h>
 #include <bits/stdc++.h>
@@ -34,6 +35,7 @@ namespace utils {
     std::size_t padding;
     std::string vertex;
     bool cpu;
+    bool save_res;
     // Not command line arguments
     std::size_t side;
     std::size_t tiles_per_ipu = 0;
@@ -53,12 +55,12 @@ namespace utils {
     ("help", "Show command help.")
     (
       "num-ipus",
-      po::value<unsigned>(&options.num_ipus)->default_value(1),
+      po::value<unsigned>(&options.num_ipus)->default_value(4),
       "Number of IPUs (must be a power of 2)"
     )
     (
       "num-iterations",
-      po::value<unsigned>(&options.num_iterations)->default_value(10),
+      po::value<unsigned>(&options.num_iterations)->default_value(100),
       "PDE: number of iterations to execute on grid."
     )
     (
@@ -90,6 +92,11 @@ namespace utils {
       "vertex",
       po::value<std::string>(&options.vertex)->default_value("WaveEquationSimple"),
       "Name of vertex (from codelets.cpp) to use for the computation."
+    )
+    (
+      "save-result",
+      po::bool_switch(&options.save_res)->default_value(false),
+      "Save result to file result.txt"
     )
     (
       "cpu",
@@ -317,18 +324,21 @@ void printMatrix (
   std::size_t w = options.width;
   std::size_t d = options.depth;
     
-  std::cout << "IPU RESULT:" << std::endl;
+  std::fstream myfile;
+  myfile.open ("output.txt");
+  
   for (std::size_t x = 0; x < h ; ++x) {
-    std::cout << "x = " << x << std::endl << std::endl;
+    myfile << "x = " << x << std::endl << std::endl;
     for (std::size_t y = 0; y < w ; ++y) { 
-        std::cout << '\t';
+        myfile << '\t';
       for (std::size_t z = 0; z < d ; ++z) {
-            std::cout << matrix[index(x,y,z,w,d)] << ' ';
+            myfile << matrix[index(x,y,z,w,d)] << ' ';
             norm += matrix[index(x,y,z,w,d)];
       }
-        std::cout << std::endl;
+        myfile << std::endl;
     }
-    std::cout << std::endl << std::endl;
+    myfile << std::endl << std::endl;
+    myfile.close();
   }
 }
 
