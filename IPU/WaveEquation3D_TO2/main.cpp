@@ -349,8 +349,9 @@ int main (int argc, char** argv) {
     // for (std::size_t i = total_volume/2; i < total_volume; ++i)
     //   initial_values[i] = 2.0f ;//randomFloat();
     for (std::size_t i = 0; i < total_volume; ++i)
-      initial_values[i] = 1.0f ;//randomFloat();
+      initial_values[i] = 0.0f ;//randomFloat();
 
+    initial_values[options.width/2,options.depth/2,options.height/2] = 1.0f;  
       
     for (std::size_t i = 0; i < total_volume; i ++ ){
       damp_coef[i] = 1.0f;
@@ -381,8 +382,8 @@ int main (int argc, char** argv) {
     double wall_time = 1e-9*diff.count();
     printResults(options, wall_time);
     
-    if (options.save_res)
-      printMatrix(ipu_results,options);
+
+    printMatrix(ipu_results,options);
     
     if (options.cpu) { 
         printMatrix(cpu_results,options);

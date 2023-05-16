@@ -6,7 +6,7 @@
 #include <iomanip>
 #include <math.h>
 #include <bits/stdc++.h>
-
+#include <nlohmann/json.hpp>
 /*
 README
 To avoid confusion in indexing:
@@ -22,6 +22,7 @@ for x in height
 And the 3D dimension is organized as [h, w, d]
 */
 
+using json = nlohmann::json;
 namespace utils {
     
   struct Options {
@@ -55,27 +56,27 @@ namespace utils {
     ("help", "Show command help.")
     (
       "num-ipus",
-      po::value<unsigned>(&options.num_ipus)->default_value(4),
+      po::value<unsigned>(&options.num_ipus)->default_value(1),
       "Number of IPUs (must be a power of 2)"
     )
     (
       "num-iterations",
-      po::value<unsigned>(&options.num_iterations)->default_value(100),
+      po::value<unsigned>(&options.num_iterations)->default_value(13),
       "PDE: number of iterations to execute on grid."
     )
     (
       "height",
-      po::value<std::size_t>(&options.height)->default_value(10),
+      po::value<std::size_t>(&options.height)->default_value(11),
       "Heigth of a custom 3D grid"
     )
     (
       "width",
-      po::value<std::size_t>(&options.width)->default_value(10), 
+      po::value<std::size_t>(&options.width)->default_value(11), 
       "Width of a custom 3D grid"
     )
     (
       "depth",
-      po::value<std::size_t>(&options.depth)->default_value(10),
+      po::value<std::size_t>(&options.depth)->default_value(11),
       "Depth of a custom 3D grid"
     )
     (
@@ -317,29 +318,21 @@ void printMeanSquaredError(
 }
 
 void printMatrix (
-  std::vector<float> matrix, 
-  utils::Options &options) {
-  double norm = 0;
-  std::size_t h = options.height;
-  std::size_t w = options.width;
-  std::size_t d = options.depth;
-    
-  std::fstream myfile;
-  myfile.open ("output.txt");
-  
-  for (std::size_t x = 0; x < h ; ++x) {
-    myfile << "x = " << x << std::endl << std::endl;
-    for (std::size_t y = 0; y < w ; ++y) { 
-        myfile << '\t';
-      for (std::size_t z = 0; z < d ; ++z) {
-            myfile << matrix[index(x,y,z,w,d)] << ' ';
-            norm += matrix[index(x,y,z,w,d)];
-      }
-        myfile << std::endl;
-    }
-    myfile << std::endl << std::endl;
-    myfile.close();
-  }
+    std::vector<float> matrix, 
+    utils::Options &options) {
+
+
+    json jsonfile(matrix);
+
+
+
+
+    // const unsigned char a[] = "testing";
+    // jsonfile = a;
+
+    std::ofstream file("key.json");
+    file << jsonfile;
+    file.close();
 }
 
 void printNorms(
