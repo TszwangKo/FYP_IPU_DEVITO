@@ -1,7 +1,7 @@
 POPC ?= popc
 PROTOC ?= protoc
 
-LDLIBS ?= -lpoplar -lpoputil -lpopops -lboost_program_options -lprotobuf
+LDLIBS ?= -lpoplar -lpoputil -lpopops -lboost_program_options -lprotobuf -I/usr/local/include
 SOURCES = main.cpp
 TARGETS = main
 
