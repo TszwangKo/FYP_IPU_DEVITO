@@ -91,7 +91,7 @@ namespace utils {
     )
     (
       "vertex",
-      po::value<std::string>(&options.vertex)->default_value("WaveEquationSimple"),
+      po::value<std::string>(&options.vertex)->default_value("WaveEquationOptimised"),
       "Name of vertex (from codelets.cpp) to use for the computation."
     )
     (

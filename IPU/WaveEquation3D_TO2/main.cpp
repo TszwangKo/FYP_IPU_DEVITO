@@ -119,34 +119,69 @@ poplar::ComputeSet createComputeSet(
               unsigned y_high = tile_y + block_high(worker_yi, nww, tile_width);    // high y-coordinate within the ipu
 
               // NOTE: include overlap for "in_slice"
-              auto in1_padding = padding - 1; // in1 only needs surrounding 2 elements instead of 3
-              auto in1_slice = ipu_in1_slice.slice(
-                {x_low-in1_padding, y_low-in1_padding, z_low-in1_padding},
-                {x_high+in1_padding, y_high+in1_padding, z_high+in1_padding}
-              );
+              
+              poplar::Tensor in1_slice, in2_slice, damp_slice, vp_slice, out_slice;
 
-              auto in2_slice = ipu_in2_slice.slice(
-                {x_low, y_low, z_low},
-                {x_high, y_high, z_high}
-              );
-
-              auto damp_slice = ipu_damp_slice.slice(
-                {x_low-padding, y_low-padding, z_low-padding},
-                {x_high-padding, y_high-padding, z_high-padding}
-              );
-
-              auto vp_slice = ipu_vp_slice.slice(
-                {x_low, y_low, z_low},
-                {x_high, y_high, z_high}
-              );
-
-              auto out_slice = ipu_out_slice.slice(
-                {x_low, y_low, z_low},
-                {x_high, y_high, z_high}
-              );
-
+              // Connect nodes to vertex
               // Assign vertex to graph
               auto v = graph.addVertex(compute_set, options.vertex);
+
+              if (options.vertex == "WaveEquationSimple"){
+                in1_slice = ipu_in1_slice.slice(
+                  {x_low-padding, y_low-padding, z_low-padding},
+                  {x_high+padding, y_high+padding, z_high+padding}
+                );
+                 in2_slice = ipu_in2_slice.slice(
+                  {x_low-padding, y_low-padding, z_low-padding},
+                  {x_high+padding, y_high+padding, z_high+padding}
+                );
+                 damp_slice = ipu_damp_slice.slice(
+                  {x_low-padding, y_low-padding, z_low-padding},
+                  {x_high+padding, y_high+padding, z_high+padding}
+                );
+                 vp_slice = ipu_vp_slice.slice(
+                  {x_low-padding, y_low-padding, z_low-padding},
+                  {x_high+padding, y_high+padding, z_high+padding}
+                );
+                 out_slice = ipu_out_slice.slice(
+                  {x_low, y_low, z_low},
+                  {x_high, y_high, z_high}
+                );
+
+                graph.setInitialValue(v["padding"], padding);
+              }
+
+              else if (options.vertex == "WaveEquationOptimised"){
+                auto in1_padding = padding - 1; // in1 only needs surrounding 2 elements instead of 3
+                in1_slice = ipu_in1_slice.slice(
+                  {x_low-in1_padding, y_low-in1_padding, z_low-in1_padding},
+                  {x_high+in1_padding, y_high+in1_padding, z_high+in1_padding}
+                );
+
+                in2_slice = ipu_in2_slice.slice(
+                  {x_low, y_low, z_low},
+                  {x_high, y_high, z_high}
+                );
+
+                damp_slice = ipu_damp_slice.slice(
+                  {x_low-padding, y_low-padding, z_low-padding},    // damp always accesses offset x-3,y-3,z-3 elements
+                  {x_high-padding, y_high-padding, z_high-padding}  // damp always accesses offset x-3,y-3,z-3 elements
+                );
+
+                vp_slice = ipu_vp_slice.slice(
+                  {x_low, y_low, z_low},
+                  {x_high, y_high, z_high}
+                );
+
+                out_slice = ipu_out_slice.slice(
+                  {x_low, y_low, z_low},
+                  {x_high, y_high, z_high}
+                );
+
+                graph.setInitialValue(v["padding"], in1_padding);
+              }
+
+
               graph.connect(v["in1"], in1_slice.flatten(0,2));
               graph.connect(v["in2"], in2_slice.flatten(0,2));
               graph.connect(v["damp"], damp_slice.flatten(0,2));
@@ -155,7 +190,6 @@ poplar::ComputeSet createComputeSet(
               graph.setInitialValue(v["worker_height"], x_high - x_low);
               graph.setInitialValue(v["worker_width"], y_high - y_low);
               graph.setInitialValue(v["worker_depth"], z_high - z_low);
-              graph.setInitialValue(v["padding"], in1_padding);
               graph.setInitialValue(v["alpha"], options.alpha);
               graph.setTileMapping(v, tile_id);
             }
