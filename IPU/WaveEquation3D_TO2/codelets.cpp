@@ -45,15 +45,15 @@ public:
         {
           // out[idx(x-padding,y-padding,worker_width)][z-padding] = in1[idx(x,y,padded_width)][z] + in2[idx(x,y,padded_width)][z] ;
           
-          float r2 = 1.0F/(vp[idx(x,y,padded_width)][z]*vp[idx(x,y,padded_width)][z]);
-          t2[idx(x-padding,y-padding,worker_width)][z-padding] = (  r1*damp[idx(x-3,y-3,padded_width)][z-3]*t0[idx(x,y,padded_width)][z] + 
+          float r2 = 1.0F/(vp[idx(x-padding,y-padding,worker_width)][z-padding]*vp[idx(x-padding,y-padding,worker_width)][z-padding]);
+          t2[idx(x-padding,y-padding,worker_width)][z-padding] = (  r1*damp[idx(x-padding,y-padding,worker_width)][z-padding]*t0[idx(x,y,padded_width)][z] + 
                                           r2*(
                                               -r0*(-2.0F*t0[idx(x,y,padded_width)][z]) - 
                                               r0*t1[idx(x,y,padded_width)][z]) + 
                                               8.33333315e-4F*(-t0[idx(x-2,y,padded_width)][z] - t0[idx(x,y-2,padded_width)][z] - t0[idx(x,y,padded_width)][z-2] - t0[idx(x,y,padded_width)][z+2] - t0[idx(x,y+2,padded_width)][z] - t0[idx(x+2,y,padded_width)][z]) + 
                                               1.3333333e-2F*(t0[idx(x-1,y,padded_width)][z] + t0[idx(x,y-1,padded_width)][z] + t0[idx(x,y,padded_width)][z-1] + t0[idx(x,y,padded_width)][z+1] + t0[idx(x,y+1,padded_width)][z] + t0[idx(x+1,y,padded_width)][z]) - 
                                               7.49999983e-2F*t0[idx(x,y,padded_width)][z]
-                                        )/(r0*r2 + r1*damp[idx(x-3,y-3,padded_width)][z-3]);
+                                        )/(r0*r2 + r1*damp[idx(x-padding,y-padding,worker_width)][z-padding]);
         }
       }
     }

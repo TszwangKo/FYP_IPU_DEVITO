@@ -131,12 +131,12 @@ poplar::ComputeSet createComputeSet(
 
               auto damp_slice = ipu_damp_slice.slice(
                 {x_low-padding, y_low-padding, z_low-padding},
-                {x_high+padding, y_high+padding, z_high+padding}
+                {x_high-padding, y_high-padding, z_high-padding}
               );
 
               auto vp_slice = ipu_vp_slice.slice(
-                {x_low-padding, y_low-padding, z_low-padding},
-                {x_high+padding, y_high+padding, z_high+padding}
+                {x_low, y_low, z_low},
+                {x_high, y_high, z_high}
               );
 
               auto out_slice = ipu_out_slice.slice(
