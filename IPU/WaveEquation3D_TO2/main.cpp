@@ -119,14 +119,15 @@ poplar::ComputeSet createComputeSet(
               unsigned y_high = tile_y + block_high(worker_yi, nww, tile_width);    // high y-coordinate within the ipu
 
               // NOTE: include overlap for "in_slice"
+              auto in1_padding = padding - 1; // in1 only needs surrounding 2 elements instead of 3
               auto in1_slice = ipu_in1_slice.slice(
-                {x_low-padding, y_low-padding, z_low-padding},
-                {x_high+padding, y_high+padding, z_high+padding}
+                {x_low-in1_padding, y_low-in1_padding, z_low-in1_padding},
+                {x_high+in1_padding, y_high+in1_padding, z_high+in1_padding}
               );
 
               auto in2_slice = ipu_in2_slice.slice(
-                {x_low-padding, y_low-padding, z_low-padding},
-                {x_high+padding, y_high+padding, z_high+padding}
+                {x_low, y_low, z_low},
+                {x_high, y_high, z_high}
               );
 
               auto damp_slice = ipu_damp_slice.slice(
@@ -154,7 +155,7 @@ poplar::ComputeSet createComputeSet(
               graph.setInitialValue(v["worker_height"], x_high - x_low);
               graph.setInitialValue(v["worker_width"], y_high - y_low);
               graph.setInitialValue(v["worker_depth"], z_high - z_low);
-              graph.setInitialValue(v["padding"], padding);
+              graph.setInitialValue(v["padding"], in1_padding);
               graph.setInitialValue(v["alpha"], options.alpha);
               graph.setTileMapping(v, tile_id);
             }
