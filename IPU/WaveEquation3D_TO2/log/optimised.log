@@ -1,0 +1,15 @@
+3D Isotropic Diffusion
+----------------------
+Vertex             = WaveEquationOptimised
+No. IPUs           = 1
+No. Tiles          = 1472
+Total Grid         = 31*31*31 = 0.029791 million elements
+Smallest Sub-grid  = 1*3*3
+Largest Sub-grid   = 2*4*4
+alpha              = 0.5
+No. Iterations     = 13
+
+LaTeX Tabular Row
+-----------------
+No. IPUs & Grid & No. Iterations & Time [s] & Throughput [TFLOPS] & Minimum Bandwidth [TB/s] \\
+1 & $31\times 31\times 31$ & 13 & 0.00 & 0.03 & 0.13 \\

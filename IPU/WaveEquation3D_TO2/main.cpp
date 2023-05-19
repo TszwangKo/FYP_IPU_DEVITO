@@ -123,9 +123,6 @@ poplar::ComputeSet createComputeSet(
               poplar::Tensor in1_slice, in2_slice, damp_slice, vp_slice, out_slice;
 
               // Connect nodes to vertex
-              // Assign vertex to graph
-              auto v = graph.addVertex(compute_set, options.vertex);
-
               if (options.vertex == "WaveEquationSimple"){
                 in1_slice = ipu_in1_slice.slice(
                   {x_low-padding, y_low-padding, z_low-padding},
@@ -147,15 +144,12 @@ poplar::ComputeSet createComputeSet(
                   {x_low, y_low, z_low},
                   {x_high, y_high, z_high}
                 );
-
-                graph.setInitialValue(v["padding"], padding);
               }
 
               else if (options.vertex == "WaveEquationOptimised"){
-                auto in1_padding = padding - 1; // in1 only needs surrounding 2 elements instead of 3
                 in1_slice = ipu_in1_slice.slice(
-                  {x_low-in1_padding, y_low-in1_padding, z_low-in1_padding},
-                  {x_high+in1_padding, y_high+in1_padding, z_high+in1_padding}
+                  {x_low-padding, y_low-padding, z_low-padding},
+                  {x_high+padding, y_high+padding, z_high+padding}
                 );
 
                 in2_slice = ipu_in2_slice.slice(
@@ -164,8 +158,8 @@ poplar::ComputeSet createComputeSet(
                 );
 
                 damp_slice = ipu_damp_slice.slice(
-                  {x_low-padding, y_low-padding, z_low-padding},    // damp always accesses offset x-3,y-3,z-3 elements
-                  {x_high-padding, y_high-padding, z_high-padding}  // damp always accesses offset x-3,y-3,z-3 elements
+                  {x_low, y_low, z_low},    // damp always accesses offset x-3,y-3,z-3 elements
+                  {x_high, y_high, z_high}  // damp always accesses offset x-3,y-3,z-3 elements
                 );
 
                 vp_slice = ipu_vp_slice.slice(
@@ -177,11 +171,9 @@ poplar::ComputeSet createComputeSet(
                   {x_low, y_low, z_low},
                   {x_high, y_high, z_high}
                 );
-
-                graph.setInitialValue(v["padding"], in1_padding);
               }
 
-
+              auto v = graph.addVertex(compute_set, options.vertex);
               graph.connect(v["in1"], in1_slice.flatten(0,2));
               graph.connect(v["in2"], in2_slice.flatten(0,2));
               graph.connect(v["damp"], damp_slice.flatten(0,2));
@@ -190,7 +182,8 @@ poplar::ComputeSet createComputeSet(
               graph.setInitialValue(v["worker_height"], x_high - x_low);
               graph.setInitialValue(v["worker_width"], y_high - y_low);
               graph.setInitialValue(v["worker_depth"], z_high - z_low);
-              graph.setInitialValue(v["alpha"], options.alpha);
+              graph.setInitialValue(v["padding"], padding);
+              graph.setInitialValue(v["dt"], options.dt);
               graph.setTileMapping(v, tile_id);
             }
           }
@@ -286,26 +279,30 @@ std::vector<poplar::program::Program> createIpuPrograms(
   std::vector<poplar::program::Program> programs;
 
   // Program 0: move content of initial_values into both device variables a and b
+  const poplar::Tensor* u0;
+  if (options.num_iterations % 3 == 1) {  
+    u0 = &a;
+  } else if (options.num_iterations % 3 == 2) {
+    u0 = &c;
+  } else {
+    u0 = &b;
+  }
   programs.push_back(
-    poplar::program::Sequence{
-      poplar::program::Copy(host_to_device, b), // initial_values to b
-      poplar::program::Copy(b, a), // initial_values to a
-      poplar::program::Copy(b, c), // initial_values to c
-    }
+      poplar::program::Copy(host_to_device, *u0) // initial_values to 
   );
 
   //* Create compute sets (2nd Time order requires 3 compute sets)
-  auto compute_set_bc_to_a = createComputeSet(graph, b, c, a, damp, vp, options, "WaveEquation_bc_to_a");
-  auto compute_set_ca_to_b = createComputeSet(graph, c, a, b, damp, vp, options, "WaveEquation_ca_to_b");
-  auto compute_set_ab_to_c = createComputeSet(graph, a, b, c, damp, vp, options, "WaveEquation_ab_to_c");
+  auto compute_set_cb_to_a = createComputeSet(graph, c, b, a, damp, vp, options, "WaveEquation_cb_to_a");
+  auto compute_set_ac_to_b = createComputeSet(graph, a, c, b, damp, vp, options, "WaveEquation_ac_to_b");
+  auto compute_set_ba_to_c = createComputeSet(graph, b, a, c, damp, vp, options, "WaveEquation_ba_to_c");
   poplar::program::Sequence execute_this_compute_set;
 
   // Add extra iteration when iteration is not multiple of 3
   if (options.num_iterations % 3 == 1) { // if num_iterations % 3 = 1: add one extra iteration
-    execute_this_compute_set.add(poplar::program::Execute(compute_set_ab_to_c));
+    execute_this_compute_set.add(poplar::program::Execute(compute_set_ba_to_c));
   } else if (options.num_iterations % 3 == 2) { // if num_iterations % 3 = 2: add two extra iteration
-    execute_this_compute_set.add(poplar::program::Execute(compute_set_ca_to_b));
-    execute_this_compute_set.add(poplar::program::Execute(compute_set_ab_to_c));
+    execute_this_compute_set.add(poplar::program::Execute(compute_set_ac_to_b));
+    execute_this_compute_set.add(poplar::program::Execute(compute_set_ba_to_c));
   }
 
   // add iterations 
@@ -313,9 +310,9 @@ std::vector<poplar::program::Program> createIpuPrograms(
     poplar::program::Repeat(
       options.num_iterations/3, 
       poplar::program::Sequence{
-        poplar::program::Execute(compute_set_bc_to_a),
-        poplar::program::Execute(compute_set_ca_to_b),
-        poplar::program::Execute(compute_set_ab_to_c),
+        poplar::program::Execute(compute_set_cb_to_a),
+        poplar::program::Execute(compute_set_ac_to_b),
+        poplar::program::Execute(compute_set_ba_to_c),
       }
     )
   );
@@ -340,9 +337,9 @@ int main (int argc, char** argv) {
     if (options.height == 0 && options.width == 0 && options.depth == 0) {
       // This block: none of the three were given, therefore
       // construct a cubic mesh (default)
-      options.height = options.side;
-      options.width = options.side;
-      options.depth = options.side;
+      options.height = getShape()[0];
+      options.width = getShape()[1];
+      options.depth = getShape()[2];
     } else if (options.height != 0 && options.width != 0 && options.depth != 0) {
       // This block: all three were given, hence options.height, options.width, and
       // options.depth are set and good to go
@@ -378,36 +375,31 @@ int main (int argc, char** argv) {
     std::vector<float> vp_coef(total_volume); // velocity profile coefficient
     std::vector<float> cpu_results(total_volume);
 
-    // initialize initial values with random floats
-    // for (std::size_t i = 0; i < total_volume/2; ++i)
-    //   initial_values[i] = 1.0f ;//randomFloat();
-    // for (std::size_t i = total_volume/2; i < total_volume; ++i)
-    //   initial_values[i] = 2.0f ;//randomFloat();
-    for (std::size_t i = 0; i < total_volume; ++i)
-      initial_values[i] = 0.0f ;//randomFloat();
+    // initialize initial values for damp_coef vp_coef and initial_values
+    options.dt = getDt();
+    options.num_iterations = getSteps()-1;
+    std::vector<std::vector<std::vector<float>>> original_damp = getValues("damp");
+    std::vector<std::vector<std::vector<float>>> original_vp = getValues("vp");
+    std::vector<std::vector<std::vector<float>>> original_u = getValues("u");
+    
+    // for (std::size_t i = 0; i < total_volume; ++i)  
+    //   initial_values[i] = 0.0f ;//randomFloat();
 
-    initial_values[index(options.height/2,options.width/2,20,options.width,options.depth)] = 0.1f;  
+    // initial_values[index(options.height/2,options.width/2,20,options.width,options.depth)] = 0.1f;  
       
-    for (std::size_t i = 0; i < total_volume; i ++ ){
-      damp_coef[i] = randomFloat();
-    }
-      
-    std::vector<std::vector<std::vector<float>>> original_damp = getDampValues();
   
     for ( int x = 0; x < options.height ; x++ ){
         for( int y = 0 ; y < options.width ; y++ ){
             for (int z = 0 ; z < options.depth ; z++ ){
                 damp_coef[index(x,y,z,options.width,options.depth)] = original_damp[x][y][z];
-                if(z<options.depth/2) 
-                    vp_coef[index(x,y,z,options.width,options.depth)] = 1.5f;
-                else
-                    vp_coef[index(x,y,z,options.width,options.depth)] = 2.5f;
+                vp_coef[index(x,y,z,options.width,options.depth)] = original_vp[x][y][z];
+                initial_values[index(x,y,z,options.width,options.depth)] = original_u[x][y][z];
             }
         }
     }
     for ( auto& number : vp_coef){
         if(number == 0.0f){
-            std::cout << "vp_coeff must not be 0!";
+            std::cerr << "vp_coeff must not be 0!";
             return -1;
         }
     }
@@ -435,13 +427,14 @@ int main (int argc, char** argv) {
     auto diff = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
     double wall_time = 1e-9*diff.count();
     printResults(options, wall_time);
-    
+    saveMatrixToJson(ipu_results,options,"ipu.json");
+    std::cerr << "\nNorm u       = " << std::setprecision(15) << norm(ipu_results,options);
+    std::cerr << "\nNorm damp    = " << norm(damp_coef,options);
+    std::cerr << "\nNorm vp      = " << norm(vp_coef,options);
+    std::cerr << "\n";
 
-    printMatrix(ipu_results,options);
-    
     if (options.cpu) { 
-        printMatrix(cpu_results,options);
-        //
+        saveMatrixToJson(cpu_results,options,"cpu.json");
         printNorms(ipu_results, cpu_results, options);
         printMeanSquaredError(ipu_results, cpu_results, options);
     }

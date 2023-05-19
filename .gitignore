@@ -1,3 +1,9 @@
 *.gp
 main
 *.o
+
+
+devito_venv/
+devito_venv/*
+
+*.json

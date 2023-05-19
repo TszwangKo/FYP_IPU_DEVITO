@@ -23,13 +23,14 @@ And the 3D dimension is organized as [h, w, d]
 */
 
 using json = nlohmann::json;
+
 namespace utils {
     
   struct Options {
     // Command line arguments (with default values)
     unsigned num_ipus;
     unsigned num_iterations;
-    float alpha;
+    float dt;
     std::size_t height;
     std::size_t width;
     std::size_t depth;
@@ -61,32 +62,32 @@ namespace utils {
     )
     (
       "num-iterations",
-      po::value<unsigned>(&options.num_iterations)->default_value(13),
+      po::value<unsigned>(&options.num_iterations)->default_value(10),
       "PDE: number of iterations to execute on grid."
     )
     (
       "height",
-      po::value<std::size_t>(&options.height)->default_value(31),
+      po::value<std::size_t>(&options.height)->default_value(0),
       "Heigth of a custom 3D grid"
     )
     (
       "width",
-      po::value<std::size_t>(&options.width)->default_value(31), 
+      po::value<std::size_t>(&options.width)->default_value(0), 
       "Width of a custom 3D grid"
     )
     (
       "depth",
-      po::value<std::size_t>(&options.depth)->default_value(31),
+      po::value<std::size_t>(&options.depth)->default_value(0),
       "Depth of a custom 3D grid"
     )
     (
       "padding",
-      po::value<std::size_t>(&options.padding)->default_value(3),
+      po::value<std::size_t>(&options.padding)->default_value(2),
       "Padding of elements around calculation."
     )
     (
-      "alpha",
-      po::value<float>(&options.alpha)->default_value(0.5),
+      "dt",
+      po::value<float>(&options.dt)->default_value(0.5),
       "PDE: update step size given as a float."
     )
     (
@@ -227,10 +228,7 @@ std::vector<float> WaveEquationCpu(
    * NOTE: can be very slow for large grids/large number of iterations
    */
     
-  const float hx = 0.2f;
-  const float hy = 0.2f;
-  const float hz = 0.2f;
-  const float dt = 0.25f * hx * hy * hz / 0.5f;
+  const float dt = options.dt;
 
   const float r0 = 1.0f/(dt*dt);
   const float r1 = 1.0f/dt;
@@ -248,9 +246,9 @@ std::vector<float> WaveEquationCpu(
 
   // initialise vectors (including edges)
   for (std::size_t i = 0; i < initial_values.size(); ++i)  {
-    a[i] = initial_values[i]; 
+    a[i] = 0.0f; 
     b[i] = initial_values[i]; 
-    c[i] = initial_values[i]; 
+    c[i] = 0.0f; 
   }
   auto& t0 = c;
   auto& t1 = b;
@@ -262,12 +260,22 @@ std::vector<float> WaveEquationCpu(
         for (std::size_t z = padding; z < d - padding; ++z) {
             // a[index(x,y,z,w,d)(x,y,z,w,d)] = b[index(x,y,z,w,d)] + c[index(x,y,z,w,d)];
             float r2 = 1.0F/(vp[index(x,y,z,w,d)]*vp[index(x,y,z,w,d)]);
-            t2[index(x,y,z,w,d)] = (  r1*damp[index(x-3,y-3,z-3,w,d)]*t0[index(x,y,z,w,d)] + 
-                                            r2*(-r0*(-2.0F*t0[index(x,y,z,w,d)]) - r0*t1[index(x,y,z,w,d)]) + 
-                                            8.33333315e-4F*(-t0[index(x-2,y,z,w,d)] - t0[index(x,y-2,z,w,d)] - t0[index(x,y,z-2,w,d)] - t0[index(x,y,z+2,w,d)] - t0[index(x,y+2,z,w,d)] - t0[index(x+2,y,z,w,d)]) + 
-                                            1.3333333e-2F*(t0[index(x-1,y,z,w,d)] + t0[index(x,y-1,z,w,d)] + t0[index(x,y,z-1,w,d)] + t0[index(x,y,z+1,w,d)] + t0[index(x,y+1,z,w,d)] + t0[index(x+1,y,z,w,d)]) - 
-                                            7.49999983e-2F*t0[index(x,y,z,w,d)]
-                                          )/(r0*r2 + r1*damp[index(x-3,y-3,z-3,w,d)]);
+            t2[index(x,y,z,w,d)] = 
+              ( r1*damp[index(x,y,z,w,d)]*t0[index(x,y,z,w,d)] 
+                + r2*(
+                    - r0*(-2.0F*t0[index(x,y,z,w,d)]) 
+                    - r0*t1[index(x,y,z,w,d)]
+                  ) 
+                  + 8.33333315e-4F*(
+                    - t0[index(x-2,y,z,w,d)] - t0[index(x,y-2,z,w,d)] - t0[index(x,y,z-2,w,d)] 
+                    - t0[index(x,y,z+2,w,d)] - t0[index(x,y+2,z,w,d)] - t0[index(x+2,y,z,w,d)]
+                  ) 
+                  + 1.3333333e-2F*(
+                      t0[index(x-1,y,z,w,d)] + t0[index(x,y-1,z,w,d)] + t0[index(x,y,z-1,w,d)] 
+                    + t0[index(x,y,z+1,w,d)] + t0[index(x,y+1,z,w,d)] + t0[index(x+1,y,z,w,d)]
+                  ) 
+                  - 7.49999983e-2F*t0[index(x,y,z,w,d)]
+              )/(r0*r2 + r1*damp[index(x,y,z,w,d)]);
         }
       }
     }
@@ -275,8 +283,8 @@ std::vector<float> WaveEquationCpu(
     for (std::size_t x = padding; x < h - padding ; ++x) {
       for (std::size_t y = padding; y < w - padding ; ++y) { 
         for (std::size_t z = padding; z < d - padding ; ++z) {
-          c[index(x,y,z,w,d)] = b[index(x,y,z,w,d)];
-          b[index(x,y,z,w,d)] = a[index(x,y,z,w,d)];
+          b[index(x,y,z,w,d)] = c[index(x,y,z,w,d)];
+          c[index(x,y,z,w,d)] = a[index(x,y,z,w,d)];
         }
       }
     }
@@ -301,10 +309,6 @@ void printMeanSquaredError(
       for (std::size_t z = padding; z < d - padding; ++z) {
         diff = double(a[index(x,y,z,w,d)] - b[index(x,y,z,w,d)]);
         squared_error += diff*diff;
-        // if( diff!= 0 ){
-        //     std::cout << "ipu: " << a[index(x,y,z,w,d)] << std::endl;
-        //     std::cout << "cpu: " << b[index(x,y,z,w,d)] << std::endl;
-        // }
       }
     }
   }
@@ -317,29 +321,23 @@ void printMeanSquaredError(
   std::cout << "\n";
 }
 
-void printMatrix (
+void saveMatrixToJson (
     std::vector<float> matrix, 
-    utils::Options &options) {
+    utils::Options &options,
+    std::string file_name) {
 
-
+    std::string path_name = "./json/" + file_name; 
     json jsonfile(matrix);
 
-
-
-
-    // const unsigned char a[] = "testing";
-    // jsonfile = a;
-
-    std::ofstream file("key.json");
+    std::ofstream file(path_name);
     file << jsonfile;
     file.close();
 }
 
-void printNorms(
+void printNorm(
   std::vector<float> a, 
-  std::vector<float> b, 
   utils::Options &options) {
-  double normIpu = 0, normCpu = 0;
+  double norm = 0;
   std::size_t h = options.height;
   std::size_t w = options.width;
   std::size_t d = options.depth;
@@ -349,14 +347,40 @@ void printNorms(
   for (std::size_t x = 0; x < h ; ++x) {
     for (std::size_t y = 0; y < w ; ++y) { 
       for (std::size_t z = 0; z < d ; ++z) {
-            normIpu += a[index(x,y,z,w,d)];
-            normCpu += b[index(x,y,z,w,d)];
+            norm += a[index(x,y,z,w,d)]*a[index(x,y,z,w,d)];
       }
     }
   }
     std::cout << std::endl;
-    std::cout << "\n IPU L2 Norm =" << normIpu << std::endl;
-    std::cout << "\n CPU L2 Norm =" << normCpu << std::endl;
+    std::cout << "\n L2 Norm =" << norm << std::endl;
+}
+
+double norm(
+  std::vector<float> a, 
+  utils::Options &options) {
+  double norm = 0;
+  std::size_t h = options.height;
+  std::size_t w = options.width;
+  std::size_t d = options.depth;
+  
+  for (std::size_t x = 0; x < h ; ++x) {
+    for (std::size_t y = 0; y < w ; ++y) { 
+      for (std::size_t z = 0; z < d ; ++z) {
+            norm += a[index(x,y,z,w,d)]*a[index(x,y,z,w,d)];
+      }
+    }
+  }
+  
+  return sqrt(norm);
+}
+
+void printNorms(
+  std::vector<float> a, 
+  std::vector<float> b, 
+  utils::Options &options) {
+    std::cout << std::endl;
+    std::cout << "\n IPU L2 Norm =" << norm(a,options) << std::endl;
+    std::cout << "\n CPU L2 Norm =" << norm(b,options)  << std::endl;
 }
 
 void printResults(utils::Options &options, double wall_time) {
@@ -380,7 +404,7 @@ void printResults(utils::Options &options, double wall_time) {
                                  << options.height*options.width*options.depth*1e-6 << " million elements"
     << "\nSmallest Sub-grid  = " << options.smallest_slice[0] << "*" << options.smallest_slice[1] << "*" << options.smallest_slice[2] 
     << "\nLargest Sub-grid   = " << options.largest_slice[0] << "*" << options.largest_slice[1] << "*" << options.largest_slice[2] 
-    << "\nalpha              = " << options.alpha
+    << "\ndt                 = " << std::setprecision (20) <<  options.dt
     << "\nNo. Iterations     = " << options.num_iterations
     << "\n"
     << "\nLaTeX Tabular Row"
@@ -395,11 +419,32 @@ void printResults(utils::Options &options, double wall_time) {
     << "\n";
 }
 
-std::vector<std::vector<std::vector<float>>> getDampValues(){
-    std::ifstream ifs("damp.json");
+std::vector<std::vector<std::vector<float>>> getValues(std::string key){
+    std::ifstream ifs("./devito/parameters.json");
     json jf = json::parse(ifs);
 
-    return jf.get<std::vector<std::vector<std::vector<float>>>>();
+    return jf[key].get<std::vector<std::vector<std::vector<float>>>>();
+}
+
+float getDt(){
+    std::ifstream ifs("./devito/parameters.json");
+    json jf = json::parse(ifs);
+
+    return jf["dt"].get<float>();
+}
+
+std::vector<float> getShape(){
+    std::ifstream ifs("./devito/parameters.json");
+    json jf = json::parse(ifs);
+
+    return jf["shape"].get<std::vector<float>>();
+}
+
+int getSteps(){
+    std::ifstream ifs("./devito/parameters.json");
+    json jf = json::parse(ifs);
+
+    return jf["steps"].get<int>();
 }
 
 void printMultiIpuGridInfo(std::size_t base_length) {
