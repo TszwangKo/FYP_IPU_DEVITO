@@ -57,22 +57,22 @@ namespace utils {
     )
     (
       "num-iterations",
-      po::value<unsigned>(&options.num_iterations)->default_value(100000),
+      po::value<unsigned>(&options.num_iterations)->default_value(1000),
       "PDE: number of iterations to execute on grid."
     )
     (
       "height",
-      po::value<std::size_t>(&options.height)->default_value(0),
+      po::value<std::size_t>(&options.height)->default_value(360),
       "Heigth of a custom 3D grid"
     )
     (
       "width",
-      po::value<std::size_t>(&options.width)->default_value(0), 
+      po::value<std::size_t>(&options.width)->default_value(360), 
       "Width of a custom 3D grid"
     )
     (
       "depth",
-      po::value<std::size_t>(&options.depth)->default_value(0),
+      po::value<std::size_t>(&options.depth)->default_value(360),
       "Depth of a custom 3D grid"
     )
     (

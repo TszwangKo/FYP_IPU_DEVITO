@@ -1,0 +1,17 @@
+No of IPU: 1
+ ================================================== 
+3D Isotropic Diffusion
+----------------------
+Vertex             = HeatEquationOptimized
+No. IPUs           = 1
+No. Tiles          = 1472
+Total Grid         = 320*320*320 = 32.768 million elements
+Smallest Sub-grid  = 13*39*39
+Largest Sub-grid   = 14*40*40
+alpha              = 0.1
+No. Iterations     = 100000
+
+LaTeX Tabular Row
+-----------------
+No. IPUs & Grid & No. Iterations & Time [s] & Throughput [TFLOPS] & Minimum Bandwidth [TB/s] \\
+1 & $320\times 320\times 320$ & 100000 & 19.31 & 1.36 & 5.05 \\
