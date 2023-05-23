@@ -5,6 +5,15 @@
 import argparse
 import numpy as np
 
+
+import sys, os
+
+# os.system('/usr/bin/Xvfb :99 -screen 0 1024x768x24 &')
+os.environ['DISPLAY'] = ':99'
+
+import panel as pn
+pn.extension('vtk')
+
 from devito import Grid, TimeFunction, Eq, solve, Operator, Constant, norm
 
 parser = argparse.ArgumentParser(description='Process arguments.')
@@ -24,12 +33,14 @@ args = parser.parse_args()
 
 
 def plot_3dfunc(u):
+    pn.extension('vtk')
     # Plot a 3D structured grid using pyvista
 
     import matplotlib.pyplot as plt
     import pyvista as pv
 
-    cmap = plt.cm.get_cmap("viridis")
+  
+    cmap = plt.colormaps["viridis"]
     values = u.data[0, :, :, :]
     vistagrid = pv.UniformGrid()
     vistagrid.dimensions = np.array(values.shape) + 1
@@ -38,8 +49,12 @@ def plot_3dfunc(u):
     vistagrid.cell_data["values"] = values.flatten(order="F")
     vistaslices = vistagrid.slice_orthogonal()
     # vistagrid.plot(show_edges=True)
-    vistaslices.plot(cmap=cmap)
+    # vistaslices.plot(cmap=cmap)
 
+    plotter = pv.Plotter(off_screen=True)
+    color_range = abs(max(values.min(), values.max(), key=abs))
+    plotter.add_mesh(vistaslices,cmap=cmap,clim=[-color_range,color_range])
+    plotter.show(screenshot=f'./diffuse.png') 
 
 # Some variable declarations
 nx, ny, nz = args.shape
@@ -52,7 +67,6 @@ sigma = .25
 dt = sigma * dx * dz * dy / nu
 so = args.space_order
 to = 1
-print("dt %s, dx %s, dy %s, dz %s" % (dt, dx, dy, dz))
 
 grid = Grid(shape=(nx, ny, nz), extent=(2., 2., 2.))
 u = TimeFunction(name='u', grid=grid, space_order=so)
@@ -79,8 +93,6 @@ t = grid.stepping_dim
 # bc += [Eq(u[t+1, x, 0, z], 2.)]  # front
 # bc += [Eq(u[t+1, x, ny-1, z], 2.)]  # back
 
-print(eq_stencil)
-
 # Create an operator that updates the forward stencil point
 # plus adding boundary conditions
 # op = Operator([eq_stencil] + bc, subdomain=grid.interior)
@@ -95,5 +107,4 @@ op(time=nt, dt=dt, a=nu)
 if args.plot:
     plot_3dfunc(u)
 
-print("Field norm is:", norm(u))
 # import pdb;pdb.set_trace()

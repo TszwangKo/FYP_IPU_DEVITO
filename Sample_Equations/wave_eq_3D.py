@@ -5,8 +5,17 @@ from devito import TimeFunction, Eq, Operator, solve, norm
 
 from examples.seismic import Model, TimeAxis
 import codecs, json 
-import argparse
 
+
+import sys, os
+
+# os.system('/usr/bin/Xvfb :99 -screen 0 1024x768x24 &')
+os.environ['DISPLAY'] = ':99'
+
+import panel as pn
+pn.extension('vtk')
+
+import argparse
 parser = argparse.ArgumentParser(description='Process arguments.')
 
 parser.add_argument("-d", "--shape", default=(11, 11, 11), type=int, nargs="+",
@@ -23,10 +32,13 @@ parser.add_argument("-plot", "--plot", default=False, type=bool, help="Plot3D")
 args = parser.parse_args()
 
 def plot_3dfunc(u):
+    pn.extension('vtk')
     # Plot a 3D structured grid using pyvista
 
     import matplotlib.pyplot as plt
     import pyvista as pv
+
+  
     cmap = plt.colormaps["viridis"]
     values = u.data[0, :, :, :]
     vistagrid = pv.UniformGrid()
@@ -36,7 +48,12 @@ def plot_3dfunc(u):
     vistagrid.cell_data["values"] = values.flatten(order="F")
     vistaslices = vistagrid.slice_orthogonal()
     # vistagrid.plot(show_edges=True)
-    vistaslices.plot(cmap=cmap)
+    # vistaslices.plot(cmap=cmap)
+
+    plotter = pv.Plotter(off_screen=True)
+    color_range = abs(max(values.min(), values.max(), key=abs))
+    plotter.add_mesh(vistaslices,cmap=cmap,clim=[-color_range,color_range])
+    plotter.show(screenshot=f'./wave.png') 
 
 # Define a physical size
 nx, ny, nz = args.shape
@@ -90,10 +107,6 @@ op = Operator([stencil], subs=model.spacing_map)
 op.apply(time=time_range.num-1, dt=model.critical_dt)
 # op.apply(time=time_range.num-1, dt=model.critical_dt, **{'x0_blk0_size': 16, 'y0_blk0_size': 8})
 
-print(f"dt: %a",dt)
-print(f"number of steps: %a",tn/dt)
-print(f"norm: %a", norm(u))
-print(model.damp.shape)
 
 b = model.damp.data.tolist() # nested lists with same data, indices
 #    Obviously, if you already have list, you don't/can't .tolist() it
