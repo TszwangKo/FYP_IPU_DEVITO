@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <math.h>
 #include <bits/stdc++.h>
+#include <nlohmann/json.hpp>
 
 /*
 README
@@ -21,6 +22,8 @@ for x in height
 And the 3D dimension is organized as [h, w, d]
 */
 
+using json = nlohmann::json;
+
 namespace utils {
     
   struct Options {
@@ -31,6 +34,7 @@ namespace utils {
     std::size_t height;
     std::size_t width;
     std::size_t depth;
+    std::size_t padding;
     std::string vertex;
     bool cpu;
     // Not command line arguments
@@ -57,23 +61,28 @@ namespace utils {
     )
     (
       "num-iterations",
-      po::value<unsigned>(&options.num_iterations)->default_value(1000),
+      po::value<unsigned>(&options.num_iterations)->default_value(54571),
       "PDE: number of iterations to execute on grid."
     )
     (
       "height",
-      po::value<std::size_t>(&options.height)->default_value(360),
+      po::value<std::size_t>(&options.height)->default_value(11),
       "Heigth of a custom 3D grid"
     )
     (
       "width",
-      po::value<std::size_t>(&options.width)->default_value(360), 
+      po::value<std::size_t>(&options.width)->default_value(11), 
       "Width of a custom 3D grid"
     )
     (
       "depth",
-      po::value<std::size_t>(&options.depth)->default_value(360),
+      po::value<std::size_t>(&options.depth)->default_value(11),
       "Depth of a custom 3D grid"
+    )
+    (
+      "padding",
+      po::value<std::size_t>(&options.padding)->default_value(2),
+      "Padding of elements around calculation."
     )
     (
       "alpha",
@@ -200,6 +209,7 @@ void printIfNan(float number, std::string message) {
     if( isnan(number) )
         std::cout << "number" << message << std::endl;
 }
+
 std::vector<float> diffusionEquationCpu(
   const std::vector<float> initial_values, 
   const utils::Options &options) {
@@ -209,21 +219,20 @@ std::vector<float> diffusionEquationCpu(
    * solution.
    * NOTE: can be very slow for large grids/large number of iterations
    */
-  const float beta = 1.0 - 6.0*options.alpha;
-    
-    const float hx = 0.2f;
-    const float hy = 0.2f;
-    const float hz = 0.2f;
+    const float hx = 2.0f/(options.height-1);
+    const float hy = 2.0f/(options.width-1);
+    const float hz = 2.0f/(options.depth-1);
     const float dt = 0.25f * hx * hy * hz / 0.5f;
 
-    const float r0 = 1/dt;
-    const float r1 = 1/(hx*hx);
-    const float r2 = 1/(hy*hy);
-    const float r3 = 1/(hz*hz);
+    const float r0 = 1.0f/dt;
+    const float r1 = 1.0f/(hx*hx);
+    const float r2 = 1.0f/(hy*hy);
+    const float r3 = 1.0f/(hz*hz);
 
   unsigned h = options.height;
   unsigned w = options.width;
   unsigned d = options.depth;
+  unsigned padding = options.padding;
   unsigned iter = options.num_iterations;
   std::vector<float> a(initial_values.size());
   std::vector<float> b(initial_values.size());
@@ -236,9 +245,10 @@ std::vector<float> diffusionEquationCpu(
 
   // Diffusion Equation iterations
   for (std::size_t t = 0; t < iter; ++t) {
-    for (std::size_t x = 2; x < h - 2; ++x) {
-      for (std::size_t y = 2; y < w - 2; ++y) { 
-        for (std::size_t z = 2; z < d - 2; ++z) {
+    for (std::size_t x = padding; x < h - padding; ++x) {
+      for (std::size_t y = padding; y < w - padding; ++y) { 
+        for (std::size_t z = padding; z < d - padding; ++z) {
+
             const float r4 = -2.5f * b[index(x,y,z,w,d)];
             // a[index(x,y,z,w,d)] = b[index(x,y,z,w,d)]+1;
             a[index(x,y,z,w,d)] = dt * ( options.alpha * ( 
@@ -261,9 +271,9 @@ std::vector<float> diffusionEquationCpu(
       }
     }
       
-    for (std::size_t x = 2; x < h - 2 ; ++x) {
-      for (std::size_t y = 2; y < w - 2 ; ++y) { 
-        for (std::size_t z = 2; z < d - 2 ; ++z) {
+    for (std::size_t x = padding; x < h - padding ; ++x) {
+      for (std::size_t y = padding; y < w - padding ; ++y) { 
+        for (std::size_t z = padding; z < d - padding ; ++z) {
           b[index(x,y,z,w,d)] = a[index(x,y,z,w,d)];
         }
       }
@@ -283,9 +293,10 @@ void printMeanSquaredError(
   std::size_t h = options.height;
   std::size_t w = options.width;
   std::size_t d = options.depth;
-  for (std::size_t x = 2; x < h - 2; ++x) {
-    for (std::size_t y = 2; y < w - 2; ++y) { 
-      for (std::size_t z = 2; z < d - 2; ++z) {
+  std::size_t padding = options.padding;
+  for (std::size_t x = padding; x < h - padding; ++x) {
+    for (std::size_t y = padding; y < w - padding; ++y) { 
+      for (std::size_t z = padding; z < d - padding; ++z) {
         diff = double(a[index(x,y,z,w,d)] - b[index(x,y,z,w,d)]);
         squared_error += diff*diff;
         if( diff!= 0 ){
@@ -303,42 +314,44 @@ void printMeanSquaredError(
   std::cout << "\n";
 }
 
-void printMatricesAndNorm(
+void saveMatrixToJson (
+    std::vector<float> matrix, 
+    utils::Options &options,
+    std::string file_name) {
+
+    std::string path_name = "./json/" + file_name + ".json"; 
+    json jsonfile(matrix);
+
+    std::ofstream file(path_name);
+    file << jsonfile;
+    file.close();
+}
+
+double norm(
   std::vector<float> a, 
-  std::vector<float> b, 
   utils::Options &options) {
-  /*
-   * Compute the MSE, __only the inner elements__, of two 3D grids
-   */
-  double normIpu = 0, normCpu = 0;
+  double norm = 0;
   std::size_t h = options.height;
   std::size_t w = options.width;
   std::size_t d = options.depth;
-    
   
-  std::cout << "IPU RESULT:" << std::endl;
   for (std::size_t x = 0; x < h ; ++x) {
-    std::cout << "x = " << x << std::endl << std::endl;
     for (std::size_t y = 0; y < w ; ++y) { 
-        std::cout << '\t';
       for (std::size_t z = 0; z < d ; ++z) {
-            std::cout << a[index(x,y,z,w,d)] << ' ';
-            normIpu += a[index(x,y,z,w,d)];
-            normCpu += b[index(x,y,z,w,d)];
+            norm += a[index(x,y,z,w,d)]*a[index(x,y,z,w,d)];
       }
-        std::cout << std::endl;
     }
-    std::cout << std::endl << std::endl;
   }
-    
-    std::cout << "\n IPU L2 Norm =" << normIpu << std::endl;
-    std::cout << "\n CPU L2 Norm =" << normCpu << std::endl;
-  // double mean_squared_error = squared_error / (double) ((h-4)*(w-4)*(d-4));
+  
+  return sqrt(norm);
+}
 
-  // std::cout << "\nMean Squared Error (IPU vs. CPU) = " << mean_squared_error;
-  // if (mean_squared_error == double(0.0)) 
-  //   std::cout << " (exactly)";
-  // std::cout << "\n";
+void printNorms(
+  std::vector<float> a, 
+  std::vector<float> b, 
+  utils::Options &options) {
+    std::cout << "\n IPU L2 Norm = " << norm(a,options) << std::endl;
+    std::cout << "\n CPU L2 Norm = " << norm(b,options) << std::endl;
 }
 
 void printResults(utils::Options &options, double wall_time) {

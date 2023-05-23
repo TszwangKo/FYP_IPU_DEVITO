@@ -31,15 +31,19 @@ poplar::ComputeSet createComputeSet(
   unsigned nd = options.splits[2]; // Number of splits in depth
   unsigned nwh = 2; // Splits in height (among workers on a tile)
   unsigned nww = 3; // Splits in width (among workers on a tile)
+  std::size_t padding = options.padding;
   std::size_t halo_volume = 0;
+
+  const float hx = 2.0f/(options.height-1);
+  const float hy = 2.0f/(options.width-1);
+  const float hz = 2.0f/(options.depth-1);
 
   for (std::size_t ipu = 0; ipu < options.num_ipus; ++ipu) {
       
-    //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! v Whole mechanism used to allocated memories to IPU with overlap v !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     // TODO: Make an inline function for this for various space order (amount of overlap between IPU)
       
     // Ensure overlapping grids among the IPUs
-    std::size_t offset_back = 4;
+    std::size_t offset_back = 2*padding;
     auto ipu_in_slice = in.slice(
       {0, 0, block_low(ipu, options.num_ipus, options.depth-offset_back)},
       {options.height, options.width, block_high(ipu, options.num_ipus, options.depth-offset_back) + offset_back}
@@ -49,7 +53,6 @@ poplar::ComputeSet createComputeSet(
       {options.height, options.width, block_high(ipu, options.num_ipus, options.depth-offset_back) + offset_back}
     );
     std::size_t inter_depth = ipu_in_slice.shape()[2];
-    //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ^ why option.depth-2? why offset_back? why overlapping 2 layers instead of 1? ^ !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
       
     // Iterate through Tiles
@@ -57,12 +60,12 @@ poplar::ComputeSet createComputeSet(
       for (std::size_t y = 0; y < nw; ++y) {
         for (std::size_t z = 0; z < nd; ++z) {
           unsigned tile_id = index(x, y, z, nw, nd) + ipu*options.tiles_per_ipu;    // unique tile_id among all ipus
-          unsigned tile_x = block_low(x, nh, options.height-4) + 2;                 // Starting x-coordinate of the tile (+2 is padding for space order 4) 
-          unsigned tile_y = block_low(y, nw, options.width-4) + 2;                  // Starting x-coordinate of the tile (+2 is padding for space order 4)
-          unsigned tile_height = block_size(x, nh, options.height-4);               // height of the tile (That needed to be computed)
-          unsigned tile_width = block_size(y, nw, options.width-4);                 // width of the tile (That needed to be computed)
-          unsigned z_low = block_low(z, nd, inter_depth-4) + 2;                     // z coordinate of the tile within the IPU (+2 is padding for space order 4)
-          unsigned z_high = block_high(z, nd, inter_depth-4) + 2;
+          unsigned tile_x = block_low(x, nh, options.height-2*padding) + padding;                 // Starting x-coordinate of the tile (+2 is padding for space order 4) 
+          unsigned tile_y = block_low(y, nw, options.width-2*padding) + padding;                  // Starting x-coordinate of the tile (+2 is padding for space order 4)
+          unsigned tile_height = block_size(x, nh, options.height-2*padding);               // height of the tile (That needed to be computed)
+          unsigned tile_width = block_size(y, nw, options.width-2*padding);                 // width of the tile (That needed to be computed)
+          unsigned z_low = block_low(z, nd, inter_depth-2*padding) + padding;                     // z coordinate of the tile within the IPU (+2 is padding for space order 4)
+          unsigned z_high = block_high(z, nd, inter_depth-2*padding) + padding;
           unsigned tile_depth = z_high - z_low;
 
           /* Records smallest largest volume slice occured over the computation */
@@ -72,7 +75,6 @@ poplar::ComputeSet createComputeSet(
           if (volume(shape) > volume(options.largest_slice)) 
             options.largest_slice = shape;
             
-          //! Get back to halo_volume later !//
           if ((x == 0) || (x == nh - 1)) {              // edge slices of x
             halo_volume += tile_width*tile_depth;       // y*z 
           } else {
@@ -101,8 +103,8 @@ poplar::ComputeSet createComputeSet(
 
               // NOTE: include overlap for "in_slice"
               auto in_slice = ipu_in_slice.slice(
-                {x_low-2, y_low-2, z_low-2},
-                {x_high+2, y_high+2, z_high+2}
+                {x_low-padding, y_low-padding, z_low-padding},
+                {x_high+padding, y_high+padding, z_high+padding}
               );
 
               auto out_slice = ipu_out_slice.slice(
@@ -117,7 +119,11 @@ poplar::ComputeSet createComputeSet(
               graph.setInitialValue(v["worker_height"], x_high - x_low);
               graph.setInitialValue(v["worker_width"], y_high - y_low);
               graph.setInitialValue(v["worker_depth"], z_high - z_low);
+              graph.setInitialValue(v["padding"], padding);
               graph.setInitialValue(v["alpha"], options.alpha);
+              graph.setInitialValue(v["hx"], hx);
+              graph.setInitialValue(v["hy"], hy);
+              graph.setInitialValue(v["hz"], hz);
               graph.setTileMapping(v, tile_id);
             }
           }
@@ -137,6 +143,7 @@ std::vector<poplar::program::Program> createIpuPrograms(
   auto a = graph.addVariable(poplar::FLOAT, {options.height, options.width, options.depth}, "a");
   auto b = graph.addVariable(poplar::FLOAT, {options.height, options.width, options.depth}, "b");
   
+  std::size_t padding = options.padding;
   for (std::size_t ipu = 0; ipu < options.num_ipus; ++ipu) {
 
     // Partition the entire grid FIRST among IPUs by splitting in depth (dimension 2)
@@ -289,9 +296,11 @@ int main (int argc, char** argv) {
 
     // initialize initial values with random floats
     for (std::size_t i = 0; i < total_volume/2; ++i)
-      initial_values[i] = 1.0f ;//randomFloat();
-    for (std::size_t i = total_volume/2; i < total_volume; ++i)
-      initial_values[i] = 2.0f ;//randomFloat();
+      initial_values[i] = 0.0f ;//randomFloat();
+    for (std::size_t i=total_volume/2 ; i < total_volume; ++i)
+      initial_values[i] = 0.0f ;//randomFloat();
+    
+    initial_values[index(3*options.height/4,options.width/2,options.width/2,options.width,options.depth)] = 1.0f ;//randomFloat();
       
 
     // perform CPU execution (and later compute MSE in IPU vs. CPU execution)
@@ -318,8 +327,10 @@ int main (int argc, char** argv) {
     double wall_time = 1e-9*diff.count();
     printResults(options, wall_time);
 
+    saveMatrixToJson(ipu_results,options,"ipu");
+
     if (options.cpu) { 
-        printMatricesAndNorm(ipu_results, cpu_results, options);
+        printNorms(ipu_results, cpu_results, options);
         printMeanSquaredError(ipu_results, cpu_results, options);
     }
 

@@ -11,7 +11,11 @@ public:
   const unsigned worker_height;
   const unsigned worker_width;
   const unsigned worker_depth;
+  const unsigned padding;
   const float alpha;
+  const float hx;
+  const float hy;
+  const float hz;
 
   unsigned idx(unsigned x, unsigned y, unsigned w) {
     /* The index corresponding to [x,y] in for a row-wise flattened 2D variable*/
@@ -19,43 +23,41 @@ public:
   } 
 
   bool compute () {
-    const float beta{1.0f - 6.0f*alpha};
-    const float hx = 0.2f;
-    const float hy = 0.2f;
-    const float hz = 0.2f;
-    const float dt = 0.25f * hx * hy * hz / 0.5f;
+    const float dt = 0.25f * hx * hy * hz / alpha;
 
     const float r0 = 1.0F / dt;
     const float r1 = 1.0F / (hx * hx);
     const float r2 = 1.0F / (hy * hy);
     const float r3 = 1.0F / (hz * hz);
+    
+    const unsigned padded_width = worker_width + 2*padding ; 
 
-    for (std::size_t x = 2; x < worker_height + 2; ++x) {
-      for (std::size_t y = 2; y < worker_width + 2; ++y) {
-        for (std::size_t z = 2; z < worker_depth + 2; ++z) {
+    for (std::size_t x = padding; x < worker_height + padding; ++x) {
+      for (std::size_t y = padding; y < worker_width + padding; ++y) {
+        for (std::size_t z = padding; z < worker_depth + padding; ++z) {
             
-       
-            
-            const unsigned padded_width = worker_width + 4; 
             const float r4 = -2.5F * in[idx(x,y,padded_width)][z]; 
-            // out[idx(x-2,y-2,worker_width)][z-2] = in[idx(x,y,padded_width)][z] + 1;
-            out[idx(x-2,y-2,worker_width)][z-2] = dt * ( 
+            // out[idx(x-padding,y-padding,worker_width)][z-padding] = in[idx(x,y,padded_width)][z] + 1;
+            out[idx(x-padding,y-padding,worker_width)][z-padding] = dt * ( 
                                                         alpha * ( 
-                                                            r1 * (r4 -
-                                                                  8.33333333e-2F * (in[idx(x-2,y,padded_width)][z] + in[idx(x+2,y,padded_width)][z]) +
-                                                                  1.33333333F * (in[idx(x-1,y,padded_width)][z] + in[idx(x+1,y,padded_width)][z])
-                                                                 ) +
-                                                            r2 * (r4 -
-                                                                  8.33333333e-2F * (in[idx(x,y-2,padded_width)][z] + in[idx(x,y+2,padded_width)][z]) +
-                                                                  1.33333333F * (in[idx(x,y-1,padded_width)][z] + in[idx(x,y+1,padded_width)][z])
-                                                                 ) +
-                                                            r3 * (r4 -
-                                                                  8.33333333e-2F * (in[idx(x,y,padded_width)][z-2] + in[idx(x,y,padded_width)][z+2]) +
-                                                                  1.33333333F * (in[idx(x,y,padded_width)][z-1] + in[idx(x,y,padded_width)][z+1])
-                                                                )
-                                                            ) +
-                                                            r0 * in[idx(x,y,padded_width)][z]
-                                                       );
+                                                            r1 * (
+                                                                r4 
+                                                                - 8.33333333e-2F * (in[idx(x-2,y,padded_width)][z] + in[idx(x+2,y,padded_width)][z]) 
+                                                                + 1.33333333F * (in[idx(x-1,y,padded_width)][z] + in[idx(x+1,y,padded_width)][z])
+                                                                ) +
+                                                            r2 * (
+                                                              r4 
+                                                              - 8.33333333e-2F * (in[idx(x,y-2,padded_width)][z] + in[idx(x,y+2,padded_width)][z]) 
+                                                              + 1.33333333F * (in[idx(x,y-1,padded_width)][z] + in[idx(x,y+1,padded_width)][z])
+                                                              ) +
+                                                            r3 * (
+                                                              r4 
+                                                              - 8.33333333e-2F * (in[idx(x,y,padded_width)][z-2] + in[idx(x,y,padded_width)][z+2]) 
+                                                              + 1.33333333F * (in[idx(x,y,padded_width)][z-1] + in[idx(x,y,padded_width)][z+1])
+                                                            )
+                                                        ) +
+                                                        r0 * in[idx(x,y,padded_width)][z]
+                                                    );
         }
       }
     }
