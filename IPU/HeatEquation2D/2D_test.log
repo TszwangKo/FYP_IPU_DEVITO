@@ -1,37 +1,7 @@
 No of IPU: 1
  ================================================== 
-2D Isotropic Diffusion
-----------------------
-Vertex             = HeatEquationOptimized
-No. IPUs           = 1
-No. Tiles          = 1472
-Total Grid         = 8000*8000 = 64 million elements
-Smallest tile grid = 173*249
-Largest tile grid  = 174*250
-alpha              = 0.1
-No. Iterations     = 1000
-
-LaTeX Tabular Row
------------------
-No. IPUs & Grid & No. Iterations & Time [s] & Throughput [TFLOPS] & Minimum Bandwidth [TB/s] \\
-1 & $8000\times 8000$ & 1000 & 0.24 & 1.63 & 5.47 \\
 No of IPU: 2
  ================================================== 
-2D Isotropic Diffusion
-----------------------
-Vertex             = HeatEquationOptimized
-No. IPUs           = 2
-No. Tiles          = 2944
-Total Grid         = 8000*8000 = 64 million elements
-Smallest tile grid = 124*173
-Largest tile grid  = 125*174
-alpha              = 0.1
-No. Iterations     = 1000
-
-LaTeX Tabular Row
------------------
-No. IPUs & Grid & No. Iterations & Time [s] & Throughput [TFLOPS] & Minimum Bandwidth [TB/s] \\
-2 & $8000\times 8000$ & 1000 & 0.14 & 2.77 & 9.44 \\
 No of IPU: 4
  ================================================== 
 No of IPU: 8
