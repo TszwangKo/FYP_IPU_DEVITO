@@ -53,6 +53,8 @@ data_np = np.array(data)      #This converts to numpy
 
 if (data_np.ndim==1):
     data_grid = data_np.reshape(31,31,31)
+elif (data_np.ndim==3):
+    data_grid = data_np
 else:
     data_grid = data_np[0,:,:,:]
 # b = a_new.tolist() # nested lists with same data, indices

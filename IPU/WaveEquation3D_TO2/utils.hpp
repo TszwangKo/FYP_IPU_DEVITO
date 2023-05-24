@@ -67,17 +67,17 @@ namespace utils {
     )
     (
       "height",
-      po::value<std::size_t>(&options.height)->default_value(0),
+      po::value<std::size_t>(&options.height)->default_value(31),
       "Heigth of a custom 3D grid"
     )
     (
       "width",
-      po::value<std::size_t>(&options.width)->default_value(0), 
+      po::value<std::size_t>(&options.width)->default_value(31), 
       "Width of a custom 3D grid"
     )
     (
       "depth",
-      po::value<std::size_t>(&options.depth)->default_value(0),
+      po::value<std::size_t>(&options.depth)->default_value(31),
       "Depth of a custom 3D grid"
     )
     (
@@ -326,8 +326,16 @@ void saveMatrixToJson (
     utils::Options &options,
     std::string file_name) {
 
-    std::string path_name = "./json/" + file_name; 
-    json jsonfile(matrix);
+    std::vector<std::vector<std::vector<float>>> matrix_3D (options.height, std::vector<std::vector<float>>(options.width, std::vector<float>(options.depth)));
+    for ( int x = 0; x < options.height ; x++ ){
+        for( int y = 0 ; y < options.width ; y++ ){
+            for (int z = 0 ; z < options.depth ; z++ ){
+                matrix_3D[x][y][z] = matrix[index(x,y,z,options.width,options.depth)];
+            }
+        }
+    }
+    std::string path_name = "./json/" + file_name + ".json"; 
+    json jsonfile(matrix_3D);
 
     std::ofstream file(path_name);
     file << jsonfile;

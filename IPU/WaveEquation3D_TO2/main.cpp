@@ -427,14 +427,14 @@ int main (int argc, char** argv) {
     auto diff = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
     double wall_time = 1e-9*diff.count();
     printResults(options, wall_time);
-    saveMatrixToJson(ipu_results,options,"ipu.json");
+    saveMatrixToJson(ipu_results,options,"ipu");
     std::cerr << "\nNorm u       = " << std::setprecision(15) << norm(ipu_results,options);
     std::cerr << "\nNorm damp    = " << norm(damp_coef,options);
     std::cerr << "\nNorm vp      = " << norm(vp_coef,options);
     std::cerr << "\n";
 
     if (options.cpu) { 
-        saveMatrixToJson(cpu_results,options,"cpu.json");
+        saveMatrixToJson(cpu_results,options,"cpu");
         printNorms(ipu_results, cpu_results, options);
         printMeanSquaredError(ipu_results, cpu_results, options);
     }
