@@ -7,10 +7,10 @@ class WaveEquationSimple : public Vertex
 {
 public:
   WaveEquationSimple();
-  Vector<Input<Vector<float, VectorLayout::SPAN, 8, false>>> in1;
-  Vector<Input<Vector<float, VectorLayout::SPAN, 8, false>>> in2;
-  Vector<Input<Vector<float, VectorLayout::SPAN, 8, false>>> damp;
-  Vector<Input<Vector<float, VectorLayout::SPAN, 8, false>>> vp;
+  Vector<Input<Vector<float, VectorLayout::SPAN, 8, true>>> in1;
+  Vector<Input<Vector<float, VectorLayout::SPAN, 8, true>>> in2;
+  Vector<Input<Vector<float, VectorLayout::SPAN, 8, true>>> damp;
+  Vector<Input<Vector<float, VectorLayout::SPAN, 8, true>>> vp;
   Vector<Output<Vector<float, VectorLayout::SPAN, 4, false>>> out;
   const unsigned worker_height;
   const unsigned worker_width;
@@ -33,20 +33,27 @@ public:
     const unsigned padded_width = worker_width + 2*padding;
     for (std::size_t x = padding; x < worker_height + padding; ++x)
     {
-      for (std::size_t y = padding; y < worker_width + padding; ++y)
-      {
-        for (std::size_t z = padding; z < worker_depth + padding; ++z)
+        for (std::size_t y = padding; y < worker_width + padding; ++y)
         {
-          // out[idx(x-padding,y-padding,worker_width)][z-padding] = in1[idx(x,y,padded_width)][z] + in2[idx(x,y,padded_width)][z] ;
+            for (std::size_t z = padding; z < worker_depth + padding; ++z)
+            {
+            // out[idx(x-padding,y-padding,worker_width)][z-padding] = in1[idx(x,y,padded_width)][z] + in2[idx(x,y,padded_width)][z] ;
 
-          float r2 = 1.0F/(vp[idx(x,y,padded_width)][z]*vp[idx(x,y,padded_width)][z]);
-          t2[idx(x-padding,y-padding,worker_width)][z-padding] = (  r1*damp[idx(x,y,padded_width)][z]*t0[idx(x,y,padded_width)][z] + 
-                                              r2*(-r0*(-2.0F*t0[idx(x,y,padded_width)][z]) - 
-                                                r0*t1[idx(x,y,padded_width)][z]) + 
-                                              8.33333315e-4F*(-t0[idx(x-2,y,padded_width)][z] - t0[idx(x,y-2,padded_width)][z] - t0[idx(x,y,padded_width)][z-2] - t0[idx(x,y,padded_width)][z+2] - t0[idx(x,y+2,padded_width)][z] - t0[idx(x+2,y,padded_width)][z]) + 
-                                              1.3333333e-2F*(t0[idx(x-1,y,padded_width)][z] + t0[idx(x,y-1,padded_width)][z] + t0[idx(x,y,padded_width)][z-1] + t0[idx(x,y,padded_width)][z+1] + t0[idx(x,y+1,padded_width)][z] + t0[idx(x+1,y,padded_width)][z]) - 
-                                              7.49999983e-2F*t0[idx(x,y,padded_width)][z]
-                                        )/(r0*r2 + r1*damp[idx(x,y,padded_width)][z]);
+            float r2 = 1.0F/(vp[idx(x,y,padded_width)][z]*vp[idx(x,y,padded_width)][z]); //vp: 2 access + 1 store => 2 ops
+            t2[idx(x-padding,y-padding,worker_width)][z-padding] = // 1 store + 18 store (damp and t0 overlaps ,assume not reused) => 18 ops
+                    (   
+                        r1*damp[idx(x,y,padded_width)][z]*t0[idx(x,y,padded_width)][z] +                         
+                        r2*(
+                            -r0*(-2.0F*t0[idx(x,y,padded_width)][z]) - 
+                            r0*t1[idx(x,y,padded_width)][z]) + 
+                        8.33333315e-4F*(
+                            - t0[idx(x-2,y,padded_width)][z] - t0[idx(x,y-2,padded_width)][z] - t0[idx(x,y,padded_width)][z-2] - 
+                              t0[idx(x,y,padded_width)][z+2] - t0[idx(x,y+2,padded_width)][z] - t0[idx(x+2,y,padded_width)][z]) + 
+                        1.3333333e-2F*(
+                              t0[idx(x-1,y,padded_width)][z] + t0[idx(x,y-1,padded_width)][z] + t0[idx(x,y,padded_width)][z-1] + 
+                              t0[idx(x,y,padded_width)][z+1] + t0[idx(x,y+1,padded_width)][z] + t0[idx(x+1,y,padded_width)][z]) - 
+                        7.49999983e-2F*t0[idx(x,y,padded_width)][z]
+                    )/(r0*r2 + r1*damp[idx(x,y,padded_width)][z]);
         }
       }
     }

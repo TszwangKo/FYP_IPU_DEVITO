@@ -1,0 +1,119 @@
+
+==========================================================
+Runnning Benchmark for 1 ipus, side_length: ... (Optimised)
+
+Operator `initdamp` ran in 0.01 s
+Operator `Kernel` ran in 0.40 s
+dt              = 1.810999989509583
+number of steps =  24
+u[0] norm       =  0.127760440111160
+u[1] norm       =  0.127734214067459
+u[2] norm       =  0.128399893641472
+u (shape)       =  (3, 240, 240, 240)
+damp norm       =  151.47256
+vp norm         =  8505.622
+
+Created json for 1 ipu (Optimised)
+
+
+Norm u       = 0.127760394953332
+Norm damp    = 151.472566170599
+Norm vp      = 8505.62167040129
+Completed Benchmark for 1 ipu, side_length: 240 (Optimised)
+==========================================================
+
+
+==========================================================
+Runnning Benchmark for 2 ipus, side_length: 240... (Optimised)
+
+Operator `initdamp` ran in 0.02 s
+Operator `Kernel` ran in 0.81 s
+dt              = 1.810999989509583
+number of steps =  24
+u[0] norm       =  0.127760440111160
+u[1] norm       =  0.127734214067459
+u[2] norm       =  0.128399908542633
+u (shape)       =  (3, 302, 302, 302)
+damp norm       =  188.36177
+vp norm         =  12243.111
+
+Created json for 2 ipu (Optimised)
+
+
+Norm u       = 0.127760394953332
+Norm damp    = 188.361766748215
+Norm vp      = 12243.1112875772
+Completed Benchmark for 2 ipu, side_length: 302 (Optimised)
+==========================================================
+
+
+==========================================================
+Runnning Benchmark for 4 ipus, side_length: 302... (Optimised)
+
+Operator `initdamp` ran in 0.04 s
+Operator `Kernel` ran in 1.56 s
+dt              = 1.810999989509583
+number of steps =  24
+u[0] norm       =  0.127760455012321
+u[1] norm       =  0.127734214067459
+u[2] norm       =  0.128399908542633
+u (shape)       =  (3, 381, 381, 381)
+damp norm       =  235.34117
+vp norm         =  17613.783
+
+Created json for 4 ipu (Optimised)
+
+Exception: main.cpp:413 Out of memory on tile 14: 653544 bytes used but tiles only have 638976 bytes of memory
+
+==========================================================
+Runnning Benchmark for 1 ipus, side_length: 381... (Optimised)
+
+Operator `initdamp` ran in 0.01 s
+Operator `Kernel` ran in 0.40 s
+dt              = 1.810999989509583
+number of steps =  24
+u[0] norm       =  0.127760440111160
+u[1] norm       =  0.127734214067459
+u[2] norm       =  0.128399893641472
+u (shape)       =  (3, 240, 240, 240)
+damp norm       =  151.47256
+vp norm         =  8505.622
+
+Created json for 1 ipu (Optimised)
+
+Exception: main.cpp:413 Out of memory on tile 0: 681240 bytes used but tiles only have 638976 bytes of memory
+
+==========================================================
+Runnning Benchmark for 2 ipus, side_length: 240... (Optimised)
+
+Operator `initdamp` ran in 0.02 s
+Operator `Kernel` ran in 0.83 s
+dt              = 1.810999989509583
+number of steps =  24
+u[0] norm       =  0.127760440111160
+u[1] norm       =  0.127734214067459
+u[2] norm       =  0.128399908542633
+u (shape)       =  (3, 302, 302, 302)
+damp norm       =  188.36177
+vp norm         =  12243.111
+
+Created json for 2 ipu (Optimised)
+
+Exception: main.cpp:413 Out of memory on tile 0: 736624 bytes used but tiles only have 638976 bytes of memory
+
+==========================================================
+Runnning Benchmark for 4 ipus, side_length: 302... (Optimised)
+
+Operator `initdamp` ran in 0.04 s
+Operator `Kernel` ran in 1.60 s
+dt              = 1.810999989509583
+number of steps =  24
+u[0] norm       =  0.127760455012321
+u[1] norm       =  0.127734214067459
+u[2] norm       =  0.128399908542633
+u (shape)       =  (3, 381, 381, 381)
+damp norm       =  235.34117
+vp norm         =  17613.783
+
+Created json for 4 ipu (Optimised)
+

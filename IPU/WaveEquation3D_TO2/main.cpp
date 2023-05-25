@@ -417,20 +417,25 @@ int main (int argc, char** argv) {
     engine.load(device);
 
     std::size_t num_program_steps = programs.size();
+    auto stream_start = std::chrono::steady_clock::now();
     engine.run(0); // stream data to device
-    auto start = std::chrono::steady_clock::now();
+    auto exe_start = std::chrono::steady_clock::now();
     engine.run(1); // Compute set execution
-    auto stop = std::chrono::steady_clock::now();
+    auto exe_stop = std::chrono::steady_clock::now();
     engine.run(2); // Stream of results
+    auto stream_stop = std::chrono::steady_clock::now();
 
     // Report
-    auto diff = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
-    double wall_time = 1e-9*diff.count();
-    printResults(options, wall_time);
+    auto exe_diff = std::chrono::duration_cast<std::chrono::nanoseconds>(exe_stop - exe_start);
+    double wall_time = 1e-9*exe_diff.count();
+
+    auto stream_time_in = std::chrono::duration_cast<std::chrono::seconds>(exe_start - stream_start).count();
+    auto stream_time_out = std::chrono::duration_cast<std::chrono::seconds>(stream_stop - exe_stop).count();
+    auto stream_time = (stream_time_in>>1) + (stream_time_out>>1);
+
+    printResults(options, wall_time,stream_time);
     saveMatrixToJson(ipu_results,options,"ipu");
     std::cerr << "\nNorm u       = " << std::setprecision(15) << norm(ipu_results,options);
-    std::cerr << "\nNorm damp    = " << norm(damp_coef,options);
-    std::cerr << "\nNorm vp      = " << norm(vp_coef,options);
     std::cerr << "\n";
 
     if (options.cpu) { 

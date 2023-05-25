@@ -117,12 +117,14 @@ op = Operator([stencil], subs=model.spacing_map)
 op.apply(time=time_range.num-1, dt=model.critical_dt)
 # op.apply(time=time_range.num-1, dt=model.critical_dt, **{'x0_blk0_size': 16, 'y0_blk0_size': 8})
 
-# print(f"dt              = {dt:0,.15f}",file=sys.stderr)
+print(f"dt              = {dt:0,.15f}",file=sys.stderr)
 print(f"number of steps = ",int(np.ceil((nt - t0 + dt)/dt)),file=sys.stderr)
+print(f"u[0] norm       =  {np.linalg.norm(u.data[0,:,:,:]):0,.15f}",file=sys.stderr)
+print(f"u[1] norm       =  {np.linalg.norm(u.data[1,:,:,:]):0,.15f}",file=sys.stderr)
+print(f"u[2] norm       =  {np.linalg.norm(u.data[2,:,:,:]):0,.15f}",file=sys.stderr)
 print(f"u (shape)       = ", u.shape,file=sys.stderr)
-print(f"norm u[0]       =  {np.linalg.norm(u.data[0,:,:,:]):0,.15f}",file=sys.stderr)
-print(f"norm u[1]       =  {np.linalg.norm(u.data[1,:,:,:]):0,.15f}",file=sys.stderr)
-print(f"norm u[2]       =  {np.linalg.norm(u.data[2,:,:,:]):0,.15f}",file=sys.stderr)
+print(f"damp norm       = ", norm(model.damp),file=sys.stderr)
+print(f"vp norm         = ", norm(model.vp),file=sys.stderr)
 
 b = model.damp.data.tolist() # nested lists with same data, indices
 #    Obviously, if you already have list, you don't/can't .tolist() it

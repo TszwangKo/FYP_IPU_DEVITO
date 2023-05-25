@@ -1,0 +1,60 @@
+
+==========================================================
+Runnning Benchmark for 1 ipus, side_length: 230... (Optimised)
+
+Operator `initdamp` ran in 0.02 s
+Operator `Kernel` ran in 0.49 s
+dt              = 1.810999989509583
+number of steps =  24
+u[0] norm       =  0.127760440111160
+u[1] norm       =  0.127734214067459
+u[2] norm       =  0.128399908542633
+u (shape)       =  (3, 250, 250, 250)
+damp norm       =  157.42415
+vp norm         =  9077.789
+
+Created json for 1 ipu (Optimised)
+
+Exception: main.cpp:413 Out of memory on tile 1465: 732960 bytes used but tiles only have 638976 bytes of memory
+
+==========================================================
+Runnning Benchmark for 1 ipus, side_length: 240... (Optimised)
+
+Operator `initdamp` ran in 0.02 s
+Operator `Kernel` ran in 0.51 s
+dt              = 1.810999989509583
+number of steps =  24
+u[0] norm       =  0.127760440111160
+u[1] norm       =  0.127734214067459
+u[2] norm       =  0.128399908542633
+u (shape)       =  (3, 260, 260, 260)
+damp norm       =  163.37498
+vp norm         =  9662.07
+
+Created json for 1 ipu (Optimised)
+
+Exception: [json.exception.parse_error.101] parse error at line 43391498, column 12: syntax error while parsing value - unexpected end of input; expected '[', '{', or a literal
+
+==========================================================
+Runnning Benchmark for 1 ipus, side_length: 220... (Optimised)
+
+Operator `initdamp` ran in 0.01 s
+Operator `Kernel` ran in 0.41 s
+dt              = 1.810999989509583
+number of steps =  24
+u[0] norm       =  0.127760440111160
+u[1] norm       =  0.127734214067459
+u[2] norm       =  0.128399893641472
+u (shape)       =  (3, 240, 240, 240)
+damp norm       =  151.47256
+vp norm         =  8505.622
+
+Created json for 1 ipu (Optimised)
+
+
+Norm u       = 0.127760394953332
+Norm damp    = 151.472566170599
+Norm vp      = 8505.62167040129
+Completed Benchmark for 1 ipu, side_length: 220 (Optimised)
+==========================================================
+

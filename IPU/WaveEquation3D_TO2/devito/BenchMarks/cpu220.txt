@@ -1,0 +1,39 @@
+Operator `initdamp` generated in 1.04 s
+  * lowering.Clusters: 0.58 s (55.9 %)
+     * specializing.Clusters: 0.39 s (37.6 %)
+  * lowering.IET: 0.32 s (30.9 %)
+     * specializing.IET: 0.24 s (23.2 %)
+Flops reduction after symbolic optimization: [108 --> 76]
+Operator `initdamp` fetched `/tmp/devito-jitcache-uid1004/6eb5da9cd4ba047c7074f146b62d8c2ebd894b27.c` in 0.04 s from jit-cache
+Operator `initdamp` ran in 0.01 s
+Global performance: [OI=0.01, 1.73 GFlops/s]
+Local performance:
+  * section0<> ran in 0.01 s 
+  * section1<10> ran in 0.01 s [OI=0.88, 0.08 GFlops/s, 0.00 GPts/s]
+  * section2<10,240,240> ran in 0.01 s [OI=0.42, 15.74 GFlops/s, 0.00 GPts/s]
+  * section3<10> ran in 0.01 s [OI=0.88, 0.08 GFlops/s, 0.00 GPts/s]
+  * section4<10,240,240> ran in 0.01 s [OI=0.42, 38.41 GFlops/s, 0.00 GPts/s]
+  * section5<10> ran in 0.01 s [OI=0.88, 0.08 GFlops/s, 0.00 GPts/s]
+  * section6<10> ran in 0.01 s [OI=0.88, 0.08 GFlops/s, 0.00 GPts/s]
+  * section7<10> ran in 0.01 s [OI=0.88, 0.08 GFlops/s, 0.00 GPts/s]
+  * section8<10> ran in 0.01 s [OI=0.88, 0.08 GFlops/s, 0.00 GPts/s]
+  * section9<<240,10,240>,<240,10,240>,<240,240,10>,<240,240,10>> ran in 0.01 s [OI=0.01, 2.81 GFlops/s, 0.00 GPts/s]
+Performance[mode=advanced] arguments: {}
+Allocating host memory for vp(248, 248, 248) [58 MB]
+Allocating host memory for u(3, 248, 248, 248) [175 MB]
+Operator `Kernel` generated in 0.55 s
+  * lowering.Clusters: 0.27 s (50.0 %)
+     * specializing.Clusters: 0.18 s (33.4 %)
+  * lowering.IET: 0.14 s (26.0 %)
+Flops reduction after symbolic optimization: [50 --> 34]
+Operator `Kernel` fetched `/tmp/devito-jitcache-uid1004/f0f36a8a3c40a68e9c39c966a049e8b55ec9eec1.c` in 0.03 s from jit-cache
+Operator `Kernel` ran in 0.41 s
+Global performance: [OI=1.81, 24.05 GFlops/s, 0.78 GPts/s]
+Local performance:
+  * section0<23,30,30,8,8,240> ran in 0.41 s [OI=1.81, 24.20 GFlops/s, 0.79 GPts/s]
+Performance[mode=advanced] arguments: {'x0_blk0_size': 8, 'y0_blk0_size': 8}
+number of steps =  24
+u (shape)       =  (3, 240, 240, 240)
+norm u[0]       =  0.127760440111160
+norm u[1]       =  0.127734214067459
+norm u[2]       =  0.128399893641472

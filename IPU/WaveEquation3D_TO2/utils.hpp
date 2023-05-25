@@ -391,15 +391,16 @@ void printNorms(
     std::cout << "\n CPU L2 Norm =" << norm(b,options)  << std::endl;
 }
 
-void printResults(utils::Options &options, double wall_time) {
+void printResults(utils::Options &options, double wall_time, double stream_time) {
 
   // Calculate metrics
   double inner_volume = (double) options.height * (double) options.width * (double) options.depth;
-  double flops_per_element = 8.0;
+  double flops_per_element = 32.0;
   double flops = inner_volume * options.num_iterations * flops_per_element / wall_time;
-  double internal_communication_ops = 2.0*(double)options.halo_volume*(double)options.num_ipus;
-  double external_communication_ops = 4.0*(double)options.height*(double)options.width*(options.num_ipus - 1.0); // 2 load and 2 stores of a slice (partition along depth)
-  double bandwidth = (7.0*inner_volume + internal_communication_ops + external_communication_ops)*(double)options.num_iterations*sizeof(float)/wall_time;
+  double internal_communication_ops = 2.0*(double)options.halo_volume*(double)options.num_ipus*options.padding; // communication ops per layer * layers of padding 
+  double external_communication_ops = 4.0*(double)options.height*(double)options.width*(options.num_ipus - 1.0)*options.padding; // 2 load and 2 stores of a slice (partition along depth)
+  double avg_load_store_per_element = 20.0;
+  double bandwidth = (20.0*inner_volume + internal_communication_ops + external_communication_ops)*(double)options.num_iterations*sizeof(float)/wall_time;
   double tflops = flops*1e-12;
   double bandwidth_TB_s = bandwidth*1e-12;
 
@@ -417,11 +418,12 @@ void printResults(utils::Options &options, double wall_time) {
     << "\n"
     << "\nLaTeX Tabular Row"
     << "\n-----------------"
-    << "\nNo. IPUs & Grid & No. Iterations & Time [s] & Throughput [TFLOPS] & Minimum Bandwidth [TB/s] \\\\\n" 
+    << "\nNo. IPUs & Grid & No. Iterations & Exec Time [s] & Stream Time [s] & Throughput [TFLOPS] & Minimum Bandwidth [TB/s] \\\\\n" 
     << options.num_ipus << " & "
     << "$" << options.height << "\\times " << options.width << "\\times " << options.depth << "$ & " 
     << options.num_iterations << " & " << std::fixed
     << std::setprecision(2) << wall_time << " & " 
+    << std::setprecision(2) << stream_time << " & " 
     << std::setprecision(2) << tflops << " & " 
     << std::setprecision(2) << bandwidth_TB_s << " \\\\"
     << "\n";

@@ -1,0 +1,39 @@
+Operator `initdamp` generated in 1.04 s
+  * lowering.Clusters: 0.58 s (56.0 %)
+     * specializing.Clusters: 0.39 s (37.7 %)
+  * lowering.IET: 0.31 s (29.9 %)
+     * specializing.IET: 0.24 s (23.2 %)
+Flops reduction after symbolic optimization: [108 --> 76]
+Operator `initdamp` fetched `/tmp/devito-jitcache-uid1004/6eb5da9cd4ba047c7074f146b62d8c2ebd894b27.c` in 0.04 s from jit-cache
+Operator `initdamp` ran in 0.03 s
+Global performance: [OI=0.01, 1.32 GFlops/s]
+Local performance:
+  * section0<> ran in 0.02 s 
+  * section1<10> ran in 0.01 s [OI=0.88, 0.08 GFlops/s, 0.00 GPts/s]
+  * section2<10,363,363> ran in 0.01 s [OI=0.42, 16.35 GFlops/s, 0.00 GPts/s]
+  * section3<10> ran in 0.01 s [OI=0.88, 0.08 GFlops/s, 0.00 GPts/s]
+  * section4<10,363,363> ran in 0.01 s [OI=0.42, 32.62 GFlops/s, 0.00 GPts/s]
+  * section5<10> ran in 0.01 s [OI=0.88, 0.08 GFlops/s, 0.00 GPts/s]
+  * section6<10> ran in 0.01 s [OI=0.88, 0.08 GFlops/s, 0.00 GPts/s]
+  * section7<10> ran in 0.01 s [OI=0.88, 0.08 GFlops/s, 0.00 GPts/s]
+  * section8<10> ran in 0.01 s [OI=0.88, 0.08 GFlops/s, 0.00 GPts/s]
+  * section9<<363,10,363>,<363,10,363>,<363,363,10>,<363,363,10>> ran in 0.02 s [OI=0.01, 2.63 GFlops/s, 0.00 GPts/s]
+Performance[mode=advanced] arguments: {}
+Allocating host memory for vp(371, 371, 371) [195 MB]
+Allocating host memory for u(3, 371, 371, 371) [584 MB]
+Operator `Kernel` generated in 0.57 s
+  * lowering.Clusters: 0.29 s (51.1 %)
+     * specializing.Clusters: 0.20 s (35.3 %)
+  * lowering.IET: 0.14 s (24.7 %)
+Flops reduction after symbolic optimization: [50 --> 34]
+Operator `Kernel` fetched `/tmp/devito-jitcache-uid1004/f0f36a8a3c40a68e9c39c966a049e8b55ec9eec1.c` in 0.03 s from jit-cache
+Operator `Kernel` ran in 1.51 s
+Global performance: [OI=1.83, 22.59 GFlops/s, 0.73 GPts/s]
+Local performance:
+  * section0<23,45,45,8,8,363> ran in 1.51 s [OI=1.83, 22.73 GFlops/s, 0.74 GPts/s]
+Performance[mode=advanced] arguments: {'x0_blk0_size': 8, 'y0_blk0_size': 8}
+number of steps =  24
+u (shape)       =  (3, 363, 363, 363)
+norm u[0]       =  0.127760455012321
+norm u[1]       =  0.127734214067459
+norm u[2]       =  0.128399908542633
