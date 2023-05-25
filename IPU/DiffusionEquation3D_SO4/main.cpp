@@ -331,7 +331,7 @@ int main (int argc, char** argv) {
     auto exe_diff = std::chrono::duration_cast<std::chrono::nanoseconds>(exe_stop - exe_start);
     double wall_time = 1e-9*exe_diff.count();
 
-    auto stream_diff = std::chrono::duration_cast<std::chrono::nanoseconds>((exe_start - stream_end + stream_end - exe_start)/2);
+    auto stream_diff = std::chrono::duration_cast<std::chrono::nanoseconds>(exe_start - stream_start);
     double stream_time = 1e-9*stream_diff.count();
 
     printResults(options, wall_time,stream_time);

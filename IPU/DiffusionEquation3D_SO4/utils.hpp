@@ -61,7 +61,7 @@ namespace utils {
     )
     (
       "num-iterations",
-      po::value<unsigned>(&options.num_iterations)->default_value(40),
+      po::value<unsigned>(&options.num_iterations)->default_value(1000),
       "PDE: number of iterations to execute on grid."
     )
     (

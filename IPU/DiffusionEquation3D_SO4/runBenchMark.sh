@@ -4,13 +4,10 @@ mkdir -p BenchMarks
 
 set -e
 
-
-# for i in  1 2 4
-for INNER_SIDE_LENGTH in 507
+for i in  1 2 4
 do
-   i=4
    cd /home/aaronko/workspace/FYP_IPU_DEVITO/IPU/DiffusionEquation3D_SO4/
-   # INNER_SIDE_LENGTH=`python3 ./side.py --num-ipus ${i}`
+   INNER_SIDE_LENGTH=`python3 ./side.py --num-ipus ${i}`
    BUFFERED_SIDE=$(($INNER_SIDE_LENGTH+4))
    >&2 echo -e "\n==========================================================\nRunnning Benchmark for ${i} ipus, side_length: ${BUFFERED_SIDE}... (Optimised)\n"
    

@@ -1,14 +1,13 @@
 Allocating host memory for u(2, 344, 344, 344) [311 MB]
-Operator `Kernel` generated in 5.24 s
-  * lowering.Clusters: 2.96 s (56.6 %)
-     * specializing.Clusters: 2.26 s (43.3 %)
-  * lowering.IET: 1.11 s (21.3 %)
+Operator `Kernel` generated in 0.59 s
+  * lowering.Clusters: 0.33 s (56.3 %)
+     * specializing.Clusters: 0.25 s (42.7 %)
+  * lowering.IET: 0.14 s (23.9 %)
 Flops reduction after symbolic optimization: [64 --> 35]
-Operator `Kernel` jit-compiled `/tmp/devito-jitcache-uid1004/92701c0aae3fff1522bbe12753ca414d432041e3.c` in 1.33 s with `GNUCompiler`
-Operator `Kernel` ran in 14.66 s
-Global performance: [OI=3.30, 2.98 GFlops/s, 0.11 GPts/s]
+Operator `Kernel` fetched `/tmp/devito-jitcache-uid1004/9810339b3ebc32ad282a968d8c18f68273f51d99.c` in 0.03 s from jit-cache
+Operator `Kernel` ran in 0.73 s
+Global performance: [OI=3.30, 59.66 GFlops/s, 2.14 GPts/s]
 Local performance:
-  * section0<41,42,42,8,8,336> ran in 14.66 s [OI=3.30, 2.98 GFlops/s, 0.11 GPts/s]
-Performance[mode=advanced] arguments: {'x0_blk0_size': 8, 'y0_blk0_size': 8}
-gcc -O3 -g -fPIC -Wall -std=c99 -march=native -Wno-unused-result -Wno-unused-variable -Wno-unused-but-set-variable -ffast-math -shared -fopenmp /tmp/devito-jitcache-uid1004/92701c0aae3fff1522bbe12753ca414d432041e3.c -lm -o /tmp/devito-jitcache-uid1004/92701c0aae3fff1522bbe12753ca414d432041e3.so
+  * section0<41,42,42,8,8,336> ran in 0.73 s [OI=3.30, 60.13 GFlops/s, 2.15 GPts/s]
+Performance[mode=advanced] arguments: {'nthreads': 30, 'x0_blk0_size': 8, 'y0_blk0_size': 8}
 (2, 336, 336, 336)

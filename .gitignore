@@ -6,4 +6,8 @@ main
 devito_venv/
 devito_venv/*
 
+./run_devito.sh
 *.json
+
+*/BenchMarks/*
+BenchMarks

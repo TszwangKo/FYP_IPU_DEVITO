@@ -17,6 +17,6 @@ do
 
    cd /home/aaronko/workspace/FYP_IPU_DEVITO/IPU/WaveEquation3D_TO2/
    
-   ./main --num-ipus ${i} --depth ${BUFFERED_SIDE} --height ${BUFFERED_SIDE} --width ${BUFFERED_SIDE} > ./BenchMarks/Optimised_${i}ipus_${BUFFERED_SIDE}.txt
+   ./main --num-ipus ${i} --depth ${BUFFERED_SIDE} --height ${BUFFERED_SIDE} --width ${BUFFERED_SIDE} > ./BenchMarks/Optimised_interleaved_${i}ipus_${BUFFERED_SIDE}.txt
    >&2 echo -ne "Completed Benchmark for ${i} ipu, side_length: ${BUFFERED_SIDE} (Optimised)\n==========================================================\n"
 done

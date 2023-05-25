@@ -66,10 +66,10 @@ class WaveEquationOptimised : public Vertex
 public:
   WaveEquationOptimised();
 
-  Vector<Input<Vector<float, VectorLayout::SPAN, 8, false>>> in1;
-  Vector<Input<Vector<float, VectorLayout::SPAN, 8, false>>> in2;
-  Vector<Input<Vector<float, VectorLayout::SPAN, 8, false>>> damp;
-  Vector<Input<Vector<float, VectorLayout::SPAN, 8, false>>> vp;
+  Vector<Input<Vector<float, VectorLayout::SPAN, 8, true>>> in1;
+  Vector<Input<Vector<float, VectorLayout::SPAN, 8, true>>> in2;
+  Vector<Input<Vector<float, VectorLayout::SPAN, 8, true>>> damp;
+  Vector<Input<Vector<float, VectorLayout::SPAN, 8, true>>> vp;
   Vector<Output<Vector<float, VectorLayout::SPAN, 4, false>>> out;
   const unsigned worker_height;
   const unsigned worker_width;
