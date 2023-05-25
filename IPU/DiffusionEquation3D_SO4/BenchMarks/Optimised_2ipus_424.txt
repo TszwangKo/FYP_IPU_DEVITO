@@ -1,0 +1,15 @@
+3D Isotropic Diffusion
+----------------------
+Vertex             = DiffusionEquationSimple
+No. IPUs           = 2
+No. Tiles          = 2944
+Total Grid         = 424*424*424 = 76.225 million elements
+Smallest Sub-grid  = 18*26*52
+Largest Sub-grid   = 19*27*53
+alpha              = 0.5
+No. Iterations     = 40
+
+LaTeX Tabular Row
+-----------------
+No. IPUs & Grid & No. Iterations & Exec Time [s] & Stream Time [s] & Throughput [TFlops/s]  & Throughput [GPts/s] & Minimum Bandwidth [TB/s] \\
+2 & $424\times 424\times 424$ & 40 & 0.05 & 0.00 & 1.89 & 67.52 & 3.95 \\

@@ -1,0 +1,14 @@
+Allocating host memory for u(2, 428, 428, 428) [598 MB]
+Operator `Kernel` generated in 4.23 s
+  * lowering.Clusters: 1.87 s (44.3 %)
+     * specializing.Clusters: 1.28 s (30.3 %)
+  * lowering.IET: 1.38 s (32.7 %)
+     * specializing.IET: 0.96 s (22.8 %)
+Flops reduction after symbolic optimization: [64 --> 35]
+Operator `Kernel` fetched `/tmp/devito-jitcache-uid1004/92701c0aae3fff1522bbe12753ca414d432041e3.c` in 0.23 s from jit-cache
+Operator `Kernel` ran in 35.75 s
+Global performance: [OI=3.33, 2.38 GFlops/s, 0.09 GPts/s]
+Local performance:
+  * section0<41,52,52,8,8,420> ran in 35.75 s [OI=3.33, 2.38 GFlops/s, 0.09 GPts/s]
+Performance[mode=advanced] arguments: {'x0_blk0_size': 8, 'y0_blk0_size': 8}
+(2, 420, 420, 420)

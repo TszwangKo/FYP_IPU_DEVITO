@@ -1,0 +1,14 @@
+Allocating host memory for u(2, 344, 344, 344) [311 MB]
+Operator `Kernel` generated in 5.24 s
+  * lowering.Clusters: 2.96 s (56.6 %)
+     * specializing.Clusters: 2.26 s (43.3 %)
+  * lowering.IET: 1.11 s (21.3 %)
+Flops reduction after symbolic optimization: [64 --> 35]
+Operator `Kernel` jit-compiled `/tmp/devito-jitcache-uid1004/92701c0aae3fff1522bbe12753ca414d432041e3.c` in 1.33 s with `GNUCompiler`
+Operator `Kernel` ran in 14.66 s
+Global performance: [OI=3.30, 2.98 GFlops/s, 0.11 GPts/s]
+Local performance:
+  * section0<41,42,42,8,8,336> ran in 14.66 s [OI=3.30, 2.98 GFlops/s, 0.11 GPts/s]
+Performance[mode=advanced] arguments: {'x0_blk0_size': 8, 'y0_blk0_size': 8}
+gcc -O3 -g -fPIC -Wall -std=c99 -march=native -Wno-unused-result -Wno-unused-variable -Wno-unused-but-set-variable -ffast-math -shared -fopenmp /tmp/devito-jitcache-uid1004/92701c0aae3fff1522bbe12753ca414d432041e3.c -lm -o /tmp/devito-jitcache-uid1004/92701c0aae3fff1522bbe12753ca414d432041e3.so
+(2, 336, 336, 336)

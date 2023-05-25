@@ -61,22 +61,22 @@ namespace utils {
     )
     (
       "num-iterations",
-      po::value<unsigned>(&options.num_iterations)->default_value(54571),
+      po::value<unsigned>(&options.num_iterations)->default_value(40),
       "PDE: number of iterations to execute on grid."
     )
     (
       "height",
-      po::value<std::size_t>(&options.height)->default_value(11),
+      po::value<std::size_t>(&options.height)->default_value(15),
       "Heigth of a custom 3D grid"
     )
     (
       "width",
-      po::value<std::size_t>(&options.width)->default_value(11), 
+      po::value<std::size_t>(&options.width)->default_value(15), 
       "Width of a custom 3D grid"
     )
     (
       "depth",
-      po::value<std::size_t>(&options.depth)->default_value(11),
+      po::value<std::size_t>(&options.depth)->default_value(15),
       "Depth of a custom 3D grid"
     )
     (
@@ -219,9 +219,9 @@ std::vector<float> diffusionEquationCpu(
    * solution.
    * NOTE: can be very slow for large grids/large number of iterations
    */
-    const float hx = 2.0f/(options.height-1);
-    const float hy = 2.0f/(options.width-1);
-    const float hz = 2.0f/(options.depth-1);
+    const float hx = 2.0f/(options.height-2*options.padding-1);
+    const float hy = 2.0f/(options.width-2*options.padding-1);
+    const float hz = 2.0f/(options.depth-2*options.padding-1);
     const float dt = 0.25f * hx * hy * hz / 0.5f;
 
     const float r0 = 1.0f/dt;
@@ -319,8 +319,16 @@ void saveMatrixToJson (
     utils::Options &options,
     std::string file_name) {
 
+    std::vector<std::vector<std::vector<float>>> matrix_3D (options.height-options.padding*2, std::vector<std::vector<float>>(options.width-options.padding*2, std::vector<float>(options.depth-options.padding*2)));
+    for ( int x = options.padding; x < options.height-options.padding ; x++ ){
+        for( int y = options.padding ; y < options.width-options.padding ; y++ ){
+            for (int z = options.padding  ; z < options.depth-options.padding ; z++ ){
+                matrix_3D[x-options.padding][y-options.padding][z-options.padding] = matrix[index(x,y,z,options.width,options.depth)];
+            }
+        }
+    }
     std::string path_name = "./json/" + file_name + ".json"; 
-    json jsonfile(matrix);
+    json jsonfile(matrix_3D);
 
     std::ofstream file(path_name);
     file << jsonfile;
@@ -354,17 +362,20 @@ void printNorms(
     std::cout << "\n CPU L2 Norm = " << norm(b,options) << std::endl;
 }
 
-void printResults(utils::Options &options, double wall_time) {
+void printResults(utils::Options &options, double wall_time, double stream_time) {
 
   // Calculate metrics
   double inner_volume = (double) options.height * (double) options.width * (double) options.depth;
-  double flops_per_element = 8.0;
-  double flops = inner_volume * options.num_iterations * flops_per_element / wall_time;
-  double internal_communication_ops = 2.0*(double)options.halo_volume*(double)options.num_ipus;
-  double external_communication_ops = 4.0*(double)options.height*(double)options.width*(options.num_ipus - 1.0); // 2 load and 2 stores of a slice (partition along depth)
-  double bandwidth = (7.0*inner_volume + internal_communication_ops + external_communication_ops)*(double)options.num_iterations*sizeof(float)/wall_time;
+  double flops_per_element = 28.0;
+  double pts = inner_volume * options.num_iterations / wall_time;
+  double flops = pts * flops_per_element;
+  double internal_communication_ops = 2.0*(double)options.halo_volume*(double)options.num_ipus*options.padding;
+  double external_communication_ops = 4.0*(double)options.height*(double)options.width*(options.num_ipus - 1.0)*options.padding; // 2 load and 2 stores of a slice (partition along depth)
+  double avg_comms_per_elemenet=13.0f;
+  double bandwidth = (avg_comms_per_elemenet*inner_volume + internal_communication_ops + external_communication_ops)*(double)options.num_iterations*sizeof(float)/wall_time;
   double tflops = flops*1e-12;
   double bandwidth_TB_s = bandwidth*1e-12;
+  double gpts = pts*1e-9;
 
   std::cout << "3D Isotropic Diffusion"
     << "\n----------------------"
@@ -380,12 +391,14 @@ void printResults(utils::Options &options, double wall_time) {
     << "\n"
     << "\nLaTeX Tabular Row"
     << "\n-----------------"
-    << "\nNo. IPUs & Grid & No. Iterations & Time [s] & Throughput [TFLOPS] & Minimum Bandwidth [TB/s] \\\\\n" 
-    << options.num_ipus << " & "
+    << "\nNo. IPUs & Grid & No. Iterations & Exec Time [s] & Stream Time [s] & Throughput [TFlops/s]  & Throughput [GPts/s] & Minimum Bandwidth [TB/s] \\\\\n" 
+    << options.num_ipus << " & "  
     << "$" << options.height << "\\times " << options.width << "\\times " << options.depth << "$ & " 
     << options.num_iterations << " & " << std::fixed
     << std::setprecision(2) << wall_time << " & " 
+    << std::setprecision(2) << stream_time << " & " 
     << std::setprecision(2) << tflops << " & " 
+    << std::setprecision(2) << gpts << " & " 
     << std::setprecision(2) << bandwidth_TB_s << " \\\\"
     << "\n";
 }

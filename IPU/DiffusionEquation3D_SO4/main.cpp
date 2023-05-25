@@ -6,6 +6,7 @@
 
 #include <poplar/DeviceManager.hpp>
 #include <poplar/Engine.hpp>
+#include <poplar/IPUModel.hpp>
 
 #include "utils.hpp"
 
@@ -34,9 +35,10 @@ poplar::ComputeSet createComputeSet(
   std::size_t padding = options.padding;
   std::size_t halo_volume = 0;
 
-  const float hx = 2.0f/(options.height-1);
-  const float hy = 2.0f/(options.width-1);
-  const float hz = 2.0f/(options.depth-1);
+  const float hx = 2.0f/(options.height-2*options.padding-1);
+  const float hy = 2.0f/(options.width-2*options.padding-1);
+  const float hz = 2.0f/(options.depth-2*options.padding-1);
+  const float dt = 0.25f * hx * hy * hz / options.alpha;
 
   for (std::size_t ipu = 0; ipu < options.num_ipus; ++ipu) {
       
@@ -124,6 +126,7 @@ poplar::ComputeSet createComputeSet(
               graph.setInitialValue(v["hx"], hx);
               graph.setInitialValue(v["hy"], hy);
               graph.setInitialValue(v["hz"], hz);
+              graph.setInitialValue(v["dt"], dt);
               graph.setTileMapping(v, tile_id);
             }
           }
@@ -300,10 +303,10 @@ int main (int argc, char** argv) {
     for (std::size_t i=total_volume/2 ; i < total_volume; ++i)
       initial_values[i] = 0.0f ;//randomFloat();
     
-    initial_values[index(3*options.height/4,options.width/2,options.width/2,options.width,options.depth)] = 1.0f ;//randomFloat();
+    initial_values[index(int(options.padding+(3*(options.height-2*options.padding)/4)),int(options.width/2),int(options.width/2),options.width,options.depth)] = 1.0f ;//randomFloat();
       
-
     // perform CPU execution (and later compute MSE in IPU vs. CPU execution)
+    saveMatrixToJson(initial_values,options,"initial_value_ipu");
     if (options.cpu) 
       cpu_results = diffusionEquationCpu(initial_values, options);
     
@@ -316,16 +319,22 @@ int main (int argc, char** argv) {
     engine.load(device);
 
     std::size_t num_program_steps = programs.size();
+    auto stream_start = std::chrono::steady_clock::now();
     engine.run(0); // stream data to device
-    auto start = std::chrono::steady_clock::now();
+    auto exe_start = std::chrono::steady_clock::now();
     engine.run(1); // Compute set execution
-    auto stop = std::chrono::steady_clock::now();
+    auto exe_stop = std::chrono::steady_clock::now();
     engine.run(2); // Stream of results
+    auto stream_end = std::chrono::steady_clock::now();
 
     // Report
-    auto diff = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
-    double wall_time = 1e-9*diff.count();
-    printResults(options, wall_time);
+    auto exe_diff = std::chrono::duration_cast<std::chrono::nanoseconds>(exe_stop - exe_start);
+    double wall_time = 1e-9*exe_diff.count();
+
+    auto stream_diff = std::chrono::duration_cast<std::chrono::nanoseconds>((exe_start - stream_end + stream_end - exe_start)/2);
+    double stream_time = 1e-9*stream_diff.count();
+
+    printResults(options, wall_time,stream_time);
 
     saveMatrixToJson(ipu_results,options,"ipu");
 
