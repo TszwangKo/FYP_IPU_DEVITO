@@ -373,8 +373,8 @@ void printResults(utils::Options &options, double wall_time, double stream_time)
   double external_communication_ops = 4.0*(double)options.height*(double)options.width*(options.num_ipus - 1.0)*options.padding; // 2 load and 2 stores of a slice (partition along depth)
   double avg_comms_per_elemenet=13.0f;
   double bandwidth = (avg_comms_per_elemenet*inner_volume + internal_communication_ops + external_communication_ops)*(double)options.num_iterations*sizeof(float)/wall_time;
-  double tflops = flops*1e-12;
   double bandwidth_TB_s = bandwidth*1e-12;
+  double gflops = flops*1e-9;
   double gpts = pts*1e-9;
 
   std::cout << "3D Isotropic Diffusion"
@@ -391,15 +391,16 @@ void printResults(utils::Options &options, double wall_time, double stream_time)
     << "\n"
     << "\nLaTeX Tabular Row"
     << "\n-----------------"
-    << "\nNo. IPUs & Grid & No. Iterations & Exec Time [s] & Stream Time [s] & Throughput [TFlops/s]  & Throughput [GPts/s] & Minimum Bandwidth [TB/s] \\\\\n" 
-    << options.num_ipus << " & "  
-    << "$" << options.height << "\\times " << options.width << "\\times " << options.depth << "$ & " 
-    << options.num_iterations << " & " << std::fixed
-    << std::setprecision(2) << wall_time << " & " 
-    << std::setprecision(2) << stream_time << " & " 
-    << std::setprecision(2) << tflops << " & " 
-    << std::setprecision(2) << gpts << " & " 
-    << std::setprecision(2) << bandwidth_TB_s << " \\\\"
+    << "\nNo. IPUs & Grid    & No. Iterations & Exec Time [s] & Stream Time [s] & Throughput [GFlops/s] & Throughput [GPts/s] & Minimum Bandwidth [TB/s] \\\\\n" 
+    << std::left << std::setw(8) << options.num_ipus << " & "  
+    << "$" << options.height  << "^3$ & "     // << "$" << options.height << "\\times " << options.width << "\\times " << options.depth << "$ & " 
+    << std::setw(14) << options.num_iterations << " & " 
+    << std::fixed << std::setprecision(3)
+    << std::setw(13) << wall_time << " & " 
+    << std::setw(15) << stream_time << " & " 
+    << std::setw(21) << gflops << " & " 
+    << std::setw(19) << gpts << " & " 
+    << std::setw(24) << bandwidth_TB_s << " \\\\"
     << "\n";
 }
 

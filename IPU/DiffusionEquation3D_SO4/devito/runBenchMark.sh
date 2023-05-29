@@ -13,11 +13,11 @@ do
 
     SIDE=${SIDE_ARRAY[nthread]};
     INNER_SIDE=$((${SIDE}-4))
-    >&2 echo -e "\n==========================================================\nRunnning Benchmark num cpu: ${nthread}, side_length: ${INNER_SIDE}(cpu)\n"
+    >&2 echo -e "\n==========================================================\nRunnning Benchmark (SIDE=${SIDE} ; ITER=${ITERATION} ; CPUs=${nthread})\n"
     export OMP_THREAD_LIMIT=${nthread}
-    DEVITO_LANGUAGE=openmp DEVITO_LOGGING=DEBUG python3 diffusion_3D_wBCs.py --shape ${INNER_SIDE} ${INNER_SIDE} ${INNER_SIDE} --nt ${ITERATION} &> ./BenchMarks/cpu${INNER_SIDE}_${ITERATION}_${OMP_THREAD_LIMIT}.txt
-    echo -ne "num_thread : ${nthread}\n" >> ./BenchMarks/cpu${INNER_SIDE}_${ITERATION}_${OMP_THREAD_LIMIT}.txt
-    >&2 echo -e "Completed Benchmark for  num cpu: ${nthread}, side_length: ${INNER_SIDE} (cpu)\n==========================================================\n"
+    DEVITO_LANGUAGE=openmp DEVITO_LOGGING=DEBUG python3 diffusion_3D_wBCs.py --shape ${INNER_SIDE} ${INNER_SIDE} ${INNER_SIDE} --nt ${ITERATION} &> ./BenchMarks/${SIDE}x${ITERATION}x${OMP_THREAD_LIMIT}cpus.txt
+    echo -ne "(SIDE=${SIDE} ; ITER=${ITERATION} ; CPUs=${nthread})\n" >> ./BenchMarks/cpu${INNER_SIDE}_${ITERATION}_${OMP_THREAD_LIMIT}.txt
+    >&2 echo -e "Benchmark Completed (SIDE=${SIDE} ; ITER=${ITERATION} ; CPUs=${nthread})\n==========================================================\n"
 done
 
  
