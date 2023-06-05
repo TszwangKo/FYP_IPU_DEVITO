@@ -6,7 +6,7 @@ def side_length( num_ipus, base_length):
   side = base_length*pow(1.25, log2_num_ipus)
   return int(side)
 
-base_length = 336
+base_length = 338
 
 parser = argparse.ArgumentParser(description='Process arguments.')
 

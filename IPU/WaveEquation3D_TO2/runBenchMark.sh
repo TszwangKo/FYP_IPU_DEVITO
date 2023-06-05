@@ -4,12 +4,15 @@ mkdir -p BenchMarks
 
 set -e
 
+ITERATION=1000
+
 for i in 1 2 4
 do
    cd /home/aaronko/workspace/FYP_IPU_DEVITO/IPU/WaveEquation3D_TO2/
    INNER_SIDE_LENGTH=`python3 ./side.py --num-ipus ${i}`
    BUFFERED_SIDE=$((${INNER_SIDE_LENGTH}+20))
-   >&2 echo -e "\n==========================================================\nRunnning Benchmark for ${i} ipus, side_length: ${BUFFERED_SIDE}... (Optimised)\n"
+
+   >&2 echo -e "\n==========================================================\nRunnning Benchmark (SIDE=${BUFFERED_SIDE} ; ITER=${ITERATION} ; IPUs=${i})\n"
    
 
    cd /home/aaronko/workspace/FYP_IPU_DEVITO/IPU/WaveEquation3D_TO2/devito
@@ -17,6 +20,6 @@ do
 
    cd /home/aaronko/workspace/FYP_IPU_DEVITO/IPU/WaveEquation3D_TO2/
    
-   ./main --num-ipus ${i} --depth ${BUFFERED_SIDE} --height ${BUFFERED_SIDE} --width ${BUFFERED_SIDE} > ./BenchMarks/Optimised_interleaved_${i}ipus_${BUFFERED_SIDE}.txt
-   >&2 echo -ne "Completed Benchmark for ${i} ipu, side_length: ${BUFFERED_SIDE} (Optimised)\n==========================================================\n"
+   ./main --num-ipus ${i} --depth ${BUFFERED_SIDE} --height ${BUFFERED_SIDE} --width ${BUFFERED_SIDE} --num-iterations ${ITERATION} > ./BenchMarks/${BUFFERED_SIDE}x${ITERATION}x${i}ipus.txt
+   >&2 echo -ne "Benchmark Completed (SIDE=${BUFFERED_SIDE} ; ITER=${ITERATION} ; IPUs=${i})\n==========================================================\n"
 done

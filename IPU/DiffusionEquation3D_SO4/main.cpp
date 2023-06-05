@@ -312,7 +312,22 @@ int main (int argc, char** argv) {
     
     // Setup of programs, graph and engine
     auto programs = createIpuPrograms(graph, options);
-    auto exe = poplar::compileGraph(graph, programs);
+
+    std::string name = "ipu" + std::to_string(options.num_ipus);
+    if(options.compile_only==true){
+      auto exe = poplar::compileGraph(graph, programs);
+      saveExe(exe,name);
+      return EXIT_SUCCESS;
+    }
+    
+    poplar::Executable exe;
+    if(options.load_exe==true){
+      exe = loadExe(name);
+    }else{
+      exe = poplar::compileGraph(graph, programs);
+      saveExe(exe,name);
+    }
+
     poplar::Engine engine(std::move(exe));
     engine.connectStream("host_to_device_stream", &initial_values[0], &initial_values[total_volume]);
     engine.connectStream("device_to_host_stream", &ipu_results[0], &ipu_results[total_volume]);

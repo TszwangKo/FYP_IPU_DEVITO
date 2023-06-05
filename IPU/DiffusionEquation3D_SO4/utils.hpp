@@ -37,6 +37,8 @@ namespace utils {
     std::size_t padding;
     std::string vertex;
     bool cpu;
+    bool compile_only;
+    bool load_exe;
     // Not command line arguments
     std::size_t side;
     std::size_t tiles_per_ipu = 0;
@@ -98,6 +100,16 @@ namespace utils {
       "cpu",
       po::bool_switch(&options.cpu)->default_value(false),
       "Also perform CPU execution to control results from IPU."
+    )
+    (
+      "compile-only",
+      po::bool_switch(&options.compile_only)->default_value(false),
+      "Compile graph object only"
+    )
+    (
+      "load-exe",
+      po::bool_switch(&options.load_exe)->default_value(false),
+      "directly load exe from file"
     ); // NOTE: remember to remove this semicolon if more options are added in future
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -333,6 +345,29 @@ void saveMatrixToJson (
     std::ofstream file(path_name);
     file << jsonfile;
     file.close();
+}
+
+inline std::string makeExeFileName(const std::string& name) {
+  return name + ".poplar.exe";
+}
+
+inline void saveExe(const poplar::Executable& exe, const std::string& name) {
+  const auto fileName = makeExeFileName(name);
+  auto outf = std::ofstream(fileName);
+  exe.serialize(outf);
+  std::cerr << "Saved Poplar executable as: " << fileName << std::endl;
+}
+
+inline poplar::Executable loadExe(const std::string& name) {
+  const auto exeName = makeExeFileName(name);
+  std::cerr << "Loading precompiled graph from: " << exeName << std::endl;
+  try {
+    auto inf = std::ifstream(exeName);
+    return poplar::Executable::deserialize(inf);
+  } catch (const poplar::poplar_error& e) {
+    std::cerr << "Error: Failed to load executable: " << exeName << std::endl; 
+    throw;
+  }
 }
 
 double norm(
