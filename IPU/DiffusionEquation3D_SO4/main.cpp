@@ -7,6 +7,7 @@
 #include <poplar/DeviceManager.hpp>
 #include <poplar/Engine.hpp>
 #include <poplar/IPUModel.hpp>
+#include <poplar/OptionFlags.hpp>
 
 #include "utils.hpp"
 
@@ -281,8 +282,18 @@ int main (int argc, char** argv) {
     }
 
     // Attach to IPU device
-    auto device = getDevice(options);
-    auto &target = device.getTarget();
+    poplar::Device device;
+    poplar::Target target;
+    poplar::OptionFlags opt;
+
+    opt.set("ipuLinkDomainSize", "64");
+
+    if (options.compile_only==true){
+        target = poplar::Target::createIPUTarget(options.num_ipus, "IPU-POD16",opt);
+    }else{
+        device = getDevice(options);
+        target = device.getTarget();
+    }
     options.num_tiles_available = target.getNumTiles();
     options.tiles_per_ipu = options.num_tiles_available / options.num_ipus;
     workDivision(options);
