@@ -324,7 +324,7 @@ int main (int argc, char** argv) {
     // Setup of programs, graph and engine
     auto programs = createIpuPrograms(graph, options);
 
-    std::string name = "ipu" + std::to_string(options.num_ipus);
+    std::string name = "ipu" + std::to_string(options.num_ipus) + "_" + std::to_string(options.height) + "_" + std::to_string(options.num_iterations) ;
     if(options.compile_only==true){
       auto exe = poplar::compileGraph(graph, programs);
       saveExe(exe,name);

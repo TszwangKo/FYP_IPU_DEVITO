@@ -8,7 +8,7 @@ import numpy as np
 import sys, os
 import codecs, json 
 
-# os.system('/usr/bin/Xvfb :99 -screen 0 1024x768x24 &')
+os.system('/usr/bin/Xvfb :99 -screen 0 1024x768x24 &')
 os.environ['DISPLAY'] = ':99'
 
 import panel as pn
@@ -61,7 +61,7 @@ def plot_3dfunc(u):
     plotter = pv.Plotter(off_screen=True)
     color_range = abs(max(values.min(), values.max(), key=abs))
     plotter.add_mesh(vistaslices,cmap=cmap,clim=[-color_range,color_range])
-    plotter.show(screenshot=f'./diffuse.png') 
+    plotter.show(screenshot=f'./diffuse_{args.shape[0]}x{args.shape[1]}x{args.shape[2]}_{args.nt}.png') 
 
 # Some variable declarations
 nx, ny, nz = args.shape
