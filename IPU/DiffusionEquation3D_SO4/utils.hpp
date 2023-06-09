@@ -180,9 +180,9 @@ void workDivision(utils::Options &options) {
    *    this function chooses nh, nw, nd, so that the surface area is minimized.
    */
   float smallest_surface_area = std::numeric_limits<float>::max();
-  std::size_t height = (options.height - 2);
-  std::size_t width = (options.width - 2);
-  std::size_t depth = (options.depth - 2) / options.num_ipus;
+  std::size_t height = (options.height - 2*options.padding);
+  std::size_t width = (options.width - 2*options.padding);
+  std::size_t depth = (options.depth - 2*options.padding) / options.num_ipus;
   std::size_t tile_count = options.num_tiles_available / options.num_ipus;
   for (std::size_t i = 1; i <= tile_count; ++i) {
     if (tile_count % i == 0) { // then i is a factor

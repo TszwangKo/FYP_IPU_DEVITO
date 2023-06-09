@@ -11,3 +11,4 @@ devito_venv/*
 
 */BenchMarks/*
 BenchMarks
+*.png
