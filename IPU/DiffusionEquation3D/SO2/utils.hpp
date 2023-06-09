@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <math.h>
 #include <bits/stdc++.h>
+#include <nlohmann/json.hpp>
 
 /*
 README
@@ -21,6 +22,8 @@ for x in height
 And the 3D dimension is organized as [h, w, d]
 */
 
+using json = nlohmann::json;
+
 namespace utils {
     
   struct Options {
@@ -31,8 +34,11 @@ namespace utils {
     std::size_t height;
     std::size_t width;
     std::size_t depth;
+    std::size_t padding;
     std::string vertex;
     bool cpu;
+    bool compile_only;
+    bool load_exe;
     // Not command line arguments
     std::size_t side;
     std::size_t tiles_per_ipu = 0;
@@ -62,18 +68,23 @@ namespace utils {
     )
     (
       "height",
-      po::value<std::size_t>(&options.height)->default_value(360),
+      po::value<std::size_t>(&options.height)->default_value(13),
       "Heigth of a custom 3D grid"
     )
     (
       "width",
-      po::value<std::size_t>(&options.width)->default_value(360), 
+      po::value<std::size_t>(&options.width)->default_value(13), 
       "Width of a custom 3D grid"
     )
     (
       "depth",
-      po::value<std::size_t>(&options.depth)->default_value(360),
+      po::value<std::size_t>(&options.depth)->default_value(13),
       "Depth of a custom 3D grid"
+    )
+    (
+      "padding",
+      po::value<std::size_t>(&options.padding)->default_value(1),
+      "Padding of elements around calculation."
     )
     (
       "alpha",
@@ -89,6 +100,16 @@ namespace utils {
       "cpu",
       po::bool_switch(&options.cpu)->default_value(false),
       "Also perform CPU execution to control results from IPU."
+    )
+    (
+      "compile-only",
+      po::bool_switch(&options.compile_only)->default_value(false),
+      "Compile graph object only"
+    )
+    (
+      "load-exe",
+      po::bool_switch(&options.load_exe)->default_value(false),
+      "directly load exe from file"
     ); // NOTE: remember to remove this semicolon if more options are added in future
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -159,9 +180,9 @@ void workDivision(utils::Options &options) {
    *    this function chooses nh, nw, nd, so that the surface area is minimized.
    */
   float smallest_surface_area = std::numeric_limits<float>::max();
-  std::size_t height = (options.height - 2);
-  std::size_t width = (options.width - 2);
-  std::size_t depth = (options.depth - 2) / options.num_ipus;
+  std::size_t height = (options.height - 2*options.padding);
+  std::size_t width = (options.width - 2*options.padding);
+  std::size_t depth = (options.depth - 2*options.padding) / options.num_ipus;
   std::size_t tile_count = options.num_tiles_available / options.num_ipus;
   for (std::size_t i = 1; i <= tile_count; ++i) {
     if (tile_count % i == 0) { // then i is a factor
@@ -196,6 +217,11 @@ void workDivision(utils::Options &options) {
   }
 }
 
+void printIfNan(float number, std::string message) {
+    if( isnan(number) )
+        std::cout << "number" << message << std::endl;
+}
+
 std::vector<float> diffusionEquationCpu(
   const std::vector<float> initial_values, 
   const utils::Options &options) {
@@ -205,21 +231,20 @@ std::vector<float> diffusionEquationCpu(
    * solution.
    * NOTE: can be very slow for large grids/large number of iterations
    */
-  const float beta = 1.0 - 6.0*options.alpha;
-    
-    const float hx = 0.2f;
-    const float hy = 0.2f;
-    const float hz = 0.2f;
+    const float hx = 2.0f/(options.height-2*options.padding-1);
+    const float hy = 2.0f/(options.width-2*options.padding-1);
+    const float hz = 2.0f/(options.depth-2*options.padding-1);
     const float dt = 0.25f * hx * hy * hz / 0.5f;
 
-    const float r0 = 1/dt;
-    const float r1 = 1/(hx*hx);
-    const float r2 = 1/(hy*hy);
-    const float r3 = 1/(hz*hz);
+    const float r0 = 1.0f/dt;
+    const float r1 = 1.0f/(hx*hx);
+    const float r2 = 1.0f/(hy*hy);
+    const float r3 = 1.0f/(hz*hz);
 
   unsigned h = options.height;
   unsigned w = options.width;
   unsigned d = options.depth;
+  unsigned padding = options.padding;
   unsigned iter = options.num_iterations;
   std::vector<float> a(initial_values.size());
   std::vector<float> b(initial_values.size());
@@ -230,25 +255,37 @@ std::vector<float> diffusionEquationCpu(
     b[i] = initial_values[i]; 
   }
 
-  // Heat Equation iterations
+  // Diffusion Equation iterations
   for (std::size_t t = 0; t < iter; ++t) {
-    for (std::size_t x = 1; x < h - 1; ++x) {
-      for (std::size_t y = 1; y < w - 1; ++y) { 
-        for (std::size_t z = 1; z < d - 1; ++z) {
-            const float r4 = -2.0f/b[index(x,y,z,w,d)];
-            a[index(x,y,z,w,d)] = dt * options.alpha * ( 
-                                        r1 * ( r4 + b[index(x-1,y,z,w,d)] + b[index(x+1,y,z,w,d)] )+
-                                        r2 * ( r4 + b[index(x,y-1,z,w,d)] + b[index(x,y+1,z,w,d)] +
-                                        r3 * ( r4 + b[index(x,y,z-1,w,d)] + b[index(x,y,z+1,w,d)] )
+    for (std::size_t x = padding; x < h - padding; ++x) {
+      for (std::size_t y = padding; y < w - padding; ++y) { 
+        for (std::size_t z = padding; z < d - padding; ++z) {
+
+            const float r4 = -2.5f * b[index(x,y,z,w,d)];
+            // a[index(x,y,z,w,d)] = b[index(x,y,z,w,d)]+1;
+            a[index(x,y,z,w,d)] = dt * ( options.alpha * ( 
+                                        r1 * ( r4 -
+                                              8.33333333e-2F * ( b[index(x-2,y,z,w,d)] + b[index(x+2,y,z,w,d)] ) +
+                                              1.33333333F * ( b[index(x-1,y,z,w,d)] + b[index(x+1,y,z,w,d)] ) 
+                                             ) +
+                                        r2 * ( r4 -
+                                              8.33333333e-2F * ( b[index(x,y-2,z,w,d)] + b[index(x,y+2,z,w,d)] ) +
+                                              1.33333333F * ( b[index(x,y-1,z,w,d)] + b[index(x,y+1,z,w,d)] ) 
+                                             )+
+                                        r3 * ( r4 -
+                                              8.33333333e-2F * (b[index(x,y,z-2,w,d)] + b[index(x,y,z+2,w,d)] ) +
+                                              1.33333333F * (b[index(x,y,z-1,w,d)] + b[index(x,y,z+1,w,d)]) 
+                                             )
                                     ) +
                                         r0 * b[index(x,y,z,w,d)]
-                                    );
+                                  );
         }
       }
     }
-    for (std::size_t x = 1; x < h - 1; ++x) {
-      for (std::size_t y = 1; y < w - 1; ++y) { 
-        for (std::size_t z = 1; z < d - 1; ++z) {
+      
+    for (std::size_t x = padding; x < h - padding ; ++x) {
+      for (std::size_t y = padding; y < w - padding ; ++y) { 
+        for (std::size_t z = padding; z < d - padding ; ++z) {
           b[index(x,y,z,w,d)] = a[index(x,y,z,w,d)];
         }
       }
@@ -268,17 +305,20 @@ void printMeanSquaredError(
   std::size_t h = options.height;
   std::size_t w = options.width;
   std::size_t d = options.depth;
-  for (std::size_t x = 1; x < h - 1; ++x) {
-    for (std::size_t y = 1; y < w - 1; ++y) { 
-      for (std::size_t z = 1; z < d - 1; ++z) {
-        std::cout << "a: " << a[index(x,y,z,w,d)] << std::endl;
-        std::cout << "b: " << b[index(x,y,z,w,d)] << std::endl;
+  std::size_t padding = options.padding;
+  for (std::size_t x = padding; x < h - padding; ++x) {
+    for (std::size_t y = padding; y < w - padding; ++y) { 
+      for (std::size_t z = padding; z < d - padding; ++z) {
         diff = double(a[index(x,y,z,w,d)] - b[index(x,y,z,w,d)]);
         squared_error += diff*diff;
+        if( diff!= 0 ){
+            std::cout << "ipu: " << a[index(x,y,z,w,d)] << std::endl;
+            std::cout << "cpu: " << b[index(x,y,z,w,d)] << std::endl;
+        }
       }
     }
   }
-  double mean_squared_error = squared_error / (double) ((h-2)*(w-2)*(d-2));
+  double mean_squared_error = squared_error / (double) ((h-4)*(w-4)*(d-4));
 
   std::cout << "\nMean Squared Error (IPU vs. CPU) = " << mean_squared_error;
   if (mean_squared_error == double(0.0)) 
@@ -286,17 +326,91 @@ void printMeanSquaredError(
   std::cout << "\n";
 }
 
-void printResults(utils::Options &options, double wall_time) {
+void saveMatrixToJson (
+    std::vector<float> matrix, 
+    utils::Options &options,
+    std::string file_name) {
+
+    std::vector<std::vector<std::vector<float>>> matrix_3D (options.height-options.padding*2, std::vector<std::vector<float>>(options.width-options.padding*2, std::vector<float>(options.depth-options.padding*2)));
+    for ( int x = options.padding; x < options.height-options.padding ; x++ ){
+        for( int y = options.padding ; y < options.width-options.padding ; y++ ){
+            for (int z = options.padding  ; z < options.depth-options.padding ; z++ ){
+                matrix_3D[x-options.padding][y-options.padding][z-options.padding] = matrix[index(x,y,z,options.width,options.depth)];
+            }
+        }
+    }
+    std::string path_name = "./json/" + file_name + ".json"; 
+    json jsonfile(matrix_3D);
+
+    std::ofstream file(path_name);
+    file << jsonfile;
+    file.close();
+}
+
+inline std::string makeExeFileName(const std::string& name) {
+  return name + ".poplar.exe";
+}
+
+inline void saveExe(const poplar::Executable& exe, const std::string& name) {
+  const auto fileName = makeExeFileName(name);
+  auto outf = std::ofstream(fileName);
+  exe.serialize(outf);
+  std::cerr << "Saved Poplar executable as: " << fileName << std::endl;
+}
+
+inline poplar::Executable loadExe(const std::string& name) {
+  const auto exeName = makeExeFileName(name);
+  std::cerr << "Loading precompiled graph from: " << exeName << std::endl;
+  try {
+    auto inf = std::ifstream(exeName);
+    return poplar::Executable::deserialize(inf);
+  } catch (const poplar::poplar_error& e) {
+    std::cerr << "Error: Failed to load executable: " << exeName << std::endl; 
+    throw;
+  }
+}
+
+double norm(
+  std::vector<float> a, 
+  utils::Options &options) {
+  double norm = 0;
+  std::size_t h = options.height;
+  std::size_t w = options.width;
+  std::size_t d = options.depth;
+  
+  for (std::size_t x = 0; x < h ; ++x) {
+    for (std::size_t y = 0; y < w ; ++y) { 
+      for (std::size_t z = 0; z < d ; ++z) {
+            norm += a[index(x,y,z,w,d)]*a[index(x,y,z,w,d)];
+      }
+    }
+  }
+  
+  return sqrt(norm);
+}
+
+void printNorms(
+  std::vector<float> a, 
+  std::vector<float> b, 
+  utils::Options &options) {
+    std::cout << "\n IPU L2 Norm = " << norm(a,options) << std::endl;
+    std::cout << "\n CPU L2 Norm = " << norm(b,options) << std::endl;
+}
+
+void printResults(utils::Options &options, double wall_time, double stream_time) {
 
   // Calculate metrics
   double inner_volume = (double) options.height * (double) options.width * (double) options.depth;
-  double flops_per_element = 8.0;
-  double flops = inner_volume * options.num_iterations * flops_per_element / wall_time;
-  double internal_communication_ops = 2.0*(double)options.halo_volume*(double)options.num_ipus;
-  double external_communication_ops = 4.0*(double)options.height*(double)options.width*(options.num_ipus - 1.0); // 2 load and 2 stores of a slice (partition along depth)
-  double bandwidth = (7.0*inner_volume + internal_communication_ops + external_communication_ops)*(double)options.num_iterations*sizeof(float)/wall_time;
-  double tflops = flops*1e-12;
+  double flops_per_element = 28.0;
+  double pts = inner_volume * options.num_iterations / wall_time;
+  double flops = pts * flops_per_element;
+  double internal_communication_ops = 2.0*(double)options.halo_volume*(double)options.num_ipus*options.padding;
+  double external_communication_ops = 4.0*(double)options.height*(double)options.width*(options.num_ipus - 1.0)*options.padding; // 2 load and 2 stores of a slice (partition along depth)
+  double avg_comms_per_elemenet=13.0f;
+  double bandwidth = (avg_comms_per_elemenet*inner_volume + internal_communication_ops + external_communication_ops)*(double)options.num_iterations*sizeof(float)/wall_time;
   double bandwidth_TB_s = bandwidth*1e-12;
+  double gflops = flops*1e-9;
+  double gpts = pts*1e-9;
 
   std::cout << "3D Isotropic Diffusion"
     << "\n----------------------"
@@ -312,13 +426,16 @@ void printResults(utils::Options &options, double wall_time) {
     << "\n"
     << "\nLaTeX Tabular Row"
     << "\n-----------------"
-    << "\nNo. IPUs & Grid & No. Iterations & Time [s] & Throughput [TFLOPS] & Minimum Bandwidth [TB/s] \\\\\n" 
-    << options.num_ipus << " & "
-    << "$" << options.height << "\\times " << options.width << "\\times " << options.depth << "$ & " 
-    << options.num_iterations << " & " << std::fixed
-    << std::setprecision(2) << wall_time << " & " 
-    << std::setprecision(2) << tflops << " & " 
-    << std::setprecision(2) << bandwidth_TB_s << " \\\\"
+    << "\nNo. IPUs & Grid    & No. Iterations & Exec Time [s] & Stream Time [s] & Throughput [GFlops/s] & Throughput [GPts/s] & Minimum Bandwidth [TB/s] \\\\\n" 
+    << std::left << std::setw(8) << options.num_ipus << " & "  
+    << "$" << options.height  << "^3$ & "     // << "$" << options.height << "\\times " << options.width << "\\times " << options.depth << "$ & " 
+    << std::setw(14) << options.num_iterations << " & " 
+    << std::fixed << std::setprecision(3)
+    << std::setw(13) << wall_time << " & " 
+    << std::setw(15) << stream_time << " & " 
+    << std::setw(21) << gflops << " & " 
+    << std::setw(19) << gpts << " & " 
+    << std::setw(24) << bandwidth_TB_s << " \\\\"
     << "\n";
 }
 

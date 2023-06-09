@@ -11,7 +11,12 @@ public:
   const unsigned worker_height;
   const unsigned worker_width;
   const unsigned worker_depth;
+  const unsigned padding;
   const float alpha;
+  const float hx;
+  const float hy;
+  const float hz;
+  const float dt;
 
   unsigned idx(unsigned x, unsigned y, unsigned w) {
     /* The index corresponding to [x,y] in for a row-wise flattened 2D variable*/
@@ -19,33 +24,40 @@ public:
   } 
 
   bool compute () {
-    const float beta{1.0f - 6.0f*alpha};
-    const float hx = 0.2f;
-    const float hy = 0.2f;
-    const float hz = 0.2f;
-    const float dt = 0.25f * hx * hy * hz / 0.5f;
 
-    const float r0 = 1/dt;
-    const float r1 = 1/(hx*hx);
-    const float r2 = 1/(hy*hy);1`
-    const float r3 = 1/(hz*hz);
-    const unsigned padded_width = worker_width + 2;
+    const float r0 = 1.0F / dt;
+    const float r1 = 1.0F / (hx * hx);
+    const float r2 = 1.0F / (hy * hy);
+    const float r3 = 1.0F / (hz * hz);
+    
+    const unsigned padded_width = worker_width + 2*padding ; 
 
-    for (std::size_t x = 1; x < worker_height + 1; ++x) {
-      for (std::size_t y = 1; y < worker_width + 1; ++y) {
-        for (std::size_t z = 1; z < worker_depth + 1; ++z) {
-            const float r4 = -2.0f/in[idx(x,y,padded_width)][z];
-            out[idx(x-1,y-1,worker_width)][z-1] = dt * alpha * ( 
-                                        r1 * ( r4 + in[idx(x-1,y,padded_width)][z] + in[idx(x+1,y,padded_width)][z] )+
-                                        r2 * ( r4 + in[idx(x,y-1,padded_width)][z] + in[idx(x,y+1,padded_width)][z] +
-                                        r3 * ( r4 + in[idx(x,y,padded_width)][z-1] +in[idx(x,y,padded_width)][z+1] )
-                                    ) +
-                                        r0 * in[idx(x,y,padded_width)][z]
-                                    );
+    for (std::size_t x = padding; x < worker_height + padding; ++x) {
+      for (std::size_t y = padding; y < worker_width + padding; ++y) {
+        for (std::size_t z = padding; z < worker_depth + padding; ++z) {
+            const float r4 = -2.84722222F*in[idx(x,y,padded_width)][z];
+            out[idx(x-padding,y-padding,worker_width)][z-padding] = dt * ( // 1 store + 1 mult
+                                                        alpha * (           // 1 mult
+                                                            r1 * ( r4 + 
+                                                              (-1.78571429e-3F)*(in[idx(x-4,y,padded_width)][z] + in[idx(x+4,y,padded_width)][z]) 
+                                                              + 2.53968254e-2F*(in[idx(x-3,y,padded_width)][z] + in[idx(x+3,y,padded_width)][z]) 
+                                                              + (-2.0e-1F)*(in[idx(x-2,y,padded_width)][z] + in[idx(x+2,y,padded_width)][z]) 
+                                                              + 1.6F*(in[idx(x-1,y,padded_width)][z] + in[idx(x+1,y,padded_width)][z])
+                                                            ) 
+                                                            + r2 * ( r4 + (-1.78571429e-3F)*(in[idx(x,y-4,padded_width)][z] +  in[idx(x,y+4,padded_width)][z]) 
+                                                                    + 2.53968254e-2F*(in[idx(x,y-3,padded_width)][z] + in[idx(x,y+3,padded_width)][z]) 
+                                                                    + (-2.0e-1F)*(in[idx(x,y-2,padded_width)][z] + in[idx(x,y+2,padded_width)][z]) 
+                                                                    + 1.6F*(in[idx(x,y-1,padded_width)][z] + in[idx(x,y+1,padded_width)][z])) 
+                                                            + r3 * ( r4 + (-1.78571429e-3F)*(in[idx(x,y,padded_width)][z-4] + in[idx(x,y+3,padded_width)][z+4]) 
+                                                                + 2.53968254e-2F*(in[idx(x,y,padded_width)][z-3] + in[idx(x,y+3,padded_width)][z+3]) 
+                                                                + (-2.0e-1F)*(in[idx(x,y,padded_width)][z-2] + in[idx(x,y+3,padded_width)][z+2]) 
+                                                                + 1.6F*(in[idx(x,y,padded_width)][z-1] + in[idx(x,y+3,padded_width)][z+1])
+                                                            )) + r0*in[idx(x,y,padded_width)][z]// 1 mult
+                                                          );
         }
       }
     }
-
+                
     return true;
   }
 };
