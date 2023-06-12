@@ -130,8 +130,8 @@ file_path = "damp.json" ## your path variable
 json.dump(b, codecs.open(file_path, 'w', encoding='utf-8'), separators=(',', ':'), sort_keys=True, indent=4) ### this saves the array in .json format
 
 
-b = u.data.tolist() # nested lists with same data, indices
-file_path = "output.json" ## your path variable
+b = u.data[0].tolist() # nested lists with same data, indices
+file_path = f"./output/{u.shape[1]}x{nt}.json" ## your path variable
 json.dump(b, codecs.open(file_path, 'w', encoding='utf-8'), 
           separators=(',', ':'), 
           sort_keys=True, 
@@ -139,16 +139,18 @@ json.dump(b, codecs.open(file_path, 'w', encoding='utf-8'),
 
 parameters = {
   "dt": float(dt),
-  "steps": int(np.ceil((nt - t0 + dt)/dt)),
+  "nt": int(nt),
+  "steps": int(np.ceil((nt - t0 + dt)/dt))+1,
   "shape": [float(model.damp.shape[0]),float(model.damp.shape[1]),float(model.damp.shape[2])],
   "damp": model.damp.data.tolist(),
   "vp": model.vp.data.tolist(),
   "u": export_u.data.tolist()
 }
+
 json_object = json.dumps(parameters, indent=4)
  
 # Writing to sample.json
-with open("parameters.json", "w") as outfile:
+with open(f"parameters_{u.shape[1]}_{nt}.json", "w") as outfile:
     outfile.write(json_object)
 
 if args.plot:

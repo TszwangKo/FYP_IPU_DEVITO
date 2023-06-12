@@ -31,6 +31,7 @@ namespace utils {
     unsigned num_ipus;
     unsigned num_iterations;
     float dt;
+    std::size_t nt;
     std::size_t height;
     std::size_t width;
     std::size_t depth;
@@ -38,6 +39,8 @@ namespace utils {
     std::string vertex;
     bool cpu;
     bool save_res;
+    bool compile_only;
+    bool load_exe;
     // Not command line arguments
     std::size_t side;
     std::size_t tiles_per_ipu = 0;
@@ -91,6 +94,11 @@ namespace utils {
       "PDE: update step size given as a float."
     )
     (
+      "nt",
+      po::value<std::size_t>(&options.nt)->default_value(40),
+      "PDE: update terminal time as an int."
+    )
+    (
       "vertex",
       po::value<std::string>(&options.vertex)->default_value("WaveEquationOptimised"),
       "Name of vertex (from codelets.cpp) to use for the computation."
@@ -104,6 +112,16 @@ namespace utils {
       "cpu",
       po::bool_switch(&options.cpu)->default_value(false),
       "Also perform CPU execution to control results from IPU."
+    )    
+    (
+      "compile-only",
+      po::bool_switch(&options.compile_only)->default_value(false),
+      "Compile graph object only"
+    )
+    (
+      "load-exe",
+      po::bool_switch(&options.load_exe)->default_value(false),
+      "directly load exe from file"
     ); // NOTE: remember to remove this semicolon if more options are added in future
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -334,12 +352,35 @@ void saveMatrixToJson (
             }
         }
     }
-    std::string path_name = "./json/" + file_name + ".json"; 
+    std::string path_name = "./output/" + file_name + ".json"; 
     json jsonfile(matrix_3D);
 
     std::ofstream file(path_name);
     file << jsonfile;
     file.close();
+}
+
+inline std::string makeExeFileName(const std::string& name) {
+  return name + ".poplar.exe";
+}
+
+inline void saveExe(const poplar::Executable& exe, const std::string& name) {
+  const auto fileName = makeExeFileName(name);
+  auto outf = std::ofstream(fileName);
+  exe.serialize(outf);
+  std::cerr << "Saved Poplar executable as: " << fileName << std::endl;
+}
+
+inline poplar::Executable loadExe(const std::string& name) {
+  const auto exeName = makeExeFileName(name);
+  std::cerr << "Loading precompiled graph from: " << exeName << std::endl;
+  try {
+    auto inf = std::ifstream(exeName);
+    return poplar::Executable::deserialize(inf);
+  } catch (const poplar::poplar_error& e) {
+    std::cerr << "Error: Failed to load executable: " << exeName << std::endl; 
+    throw;
+  }
 }
 
 void printNorm(
@@ -418,40 +459,69 @@ void printResults(utils::Options &options, double wall_time, double stream_time)
     << "\n"
     << "\nLaTeX Tabular Row"
     << "\n-----------------"
-    << "\nNo. IPUs & Grid & No. Iterations & Exec Time [s] & Stream Time [s] & Throughput [TFLOPS] & Minimum Bandwidth [TB/s] \\\\\n" 
-    << options.num_ipus << " & "
-    << "$" << options.height << "\\times " << options.width << "\\times " << options.depth << "$ & " 
-    << options.num_iterations << " & " << std::fixed
-    << std::setprecision(2) << wall_time << " & " 
-    << std::setprecision(2) << stream_time << " & " 
-    << std::setprecision(2) << tflops << " & " 
-    << std::setprecision(2) << bandwidth_TB_s << " \\\\"
+    << "\nNo. IPUs & Grid    & No. Iterations & Exec Time [s] & Stream Time [s] & Throughput [TFLOPS] & Minimum Bandwidth [TB/s] \\\\\n" 
+    << std::left << std::fixed << std::setprecision(2)
+    << std::setw(8) << options.num_ipus << " & "
+    << "$" << options.height << "^3" "$ & " 
+    << std::setw(14) << options.num_iterations << " & " 
+    << std::setw(13) << wall_time << " & " 
+    << std::setw(15) << stream_time << " & " 
+    << std::setw(19) << tflops << " & " 
+    << std::setw(24) << bandwidth_TB_s << " \\\\"
     << "\n";
 }
 
-std::vector<std::vector<std::vector<float>>> getValues(std::string key){
-    std::ifstream ifs("./devito/parameters.json");
+std::vector<std::vector<std::vector<float>>> getValues(std::string key,utils::Options &options){
+    std::string file_name = "./devito/parameters_" + std::to_string(options.height) + ".json";
+    std::ifstream ifs(file_name);
     json jf = json::parse(ifs);
 
     return jf[key].get<std::vector<std::vector<std::vector<float>>>>();
 }
 
-float getDt(){
-    std::ifstream ifs("./devito/parameters.json");
+void getCpuResult(std::vector<float>& cpu_result, utils::Options &options){
+    std::string file_name = "./devito/output/" + std::to_string(options.height) + "x" + std::to_string(options.nt) + ".json";
+    std::ifstream ifs(file_name);
+    json jf = json::parse(ifs);
+
+    std::vector<std::vector<std::vector<float>>> cpu_result_3D = jf.get<std::vector<std::vector<std::vector<float>>>>();
+
+    for ( int x = 0; x < options.height ; x++ ){
+        for( int y = 0 ; y < options.width ; y++ ){
+            for (int z = 0 ; z < options.depth ; z++ ){
+                cpu_result[index(x,y,z,options.width,options.depth)] = 0;
+            }
+        }
+    }
+}
+
+float getDt(utils::Options &options){
+    std::string file_name = "./devito/parameters_" + std::to_string(options.height) + "_" + std::to_string(options.nt) + ".json";
+    std::ifstream ifs(file_name);
     json jf = json::parse(ifs);
 
     return jf["dt"].get<float>();
+
+}
+int getNt(utils::Options &options){
+    std::string file_name = "./devito/parameters_" + std::to_string(options.height) + "_" + std::to_string(options.nt) + ".json";
+    std::ifstream ifs(file_name);
+    json jf = json::parse(ifs);
+
+    return jf["nt"].get<int>();
 }
 
-std::vector<float> getShape(){
-    std::ifstream ifs("./devito/parameters.json");
+std::vector<float> getShape(utils::Options &options){
+    std::string file_name = "./devito/parameters_" + std::to_string(options.height) + "_" + std::to_string(options.nt) + ".json";
+    std::ifstream ifs(file_name);
     json jf = json::parse(ifs);
 
     return jf["shape"].get<std::vector<float>>();
 }
 
-int getSteps(){
-    std::ifstream ifs("./devito/parameters.json");
+int getSteps(utils::Options &options){
+    std::string file_name = "./devito/parameters_" + std::to_string(options.height) + "_" + std::to_string(options.nt) + ".json";
+    std::ifstream ifs(file_name);
     json jf = json::parse(ifs);
 
     return jf["steps"].get<int>();

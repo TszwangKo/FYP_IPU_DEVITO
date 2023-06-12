@@ -7,10 +7,9 @@ set -e
 ITERATION=1000
 
 SIDE_ARRAY=(0 342 425 0 511)
-for nthread in 1 2 4
-# for SIDE in 340 424 511
+
+for SIDE in 342
 do
-    SIDE=${SIDE_ARRAY[nthread]};
     INNER_SIDE=$((${SIDE}-4))
     >&2 echo -e "\n==========================================================\nRunnning Benchmark (SIDE=${SIDE} ; ITER=${ITERATION} ; CPUs=${nthread})\n"
     export OMP_THREAD_LIMIT=${nthread}

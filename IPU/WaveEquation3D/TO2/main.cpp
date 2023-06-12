@@ -337,9 +337,9 @@ int main (int argc, char** argv) {
     if (options.height == 0 && options.width == 0 && options.depth == 0) {
       // This block: none of the three were given, therefore
       // construct a cubic mesh (default)
-      options.height = getShape()[0];
-      options.width = getShape()[1];
-      options.depth = getShape()[2];
+      options.height = getShape(options)[0];
+      options.width = getShape(options)[1];
+      options.depth = getShape(options)[2];
     } else if (options.height != 0 && options.width != 0 && options.depth != 0) {
       // This block: all three were given, hence options.height, options.width, and
       // options.depth are set and good to go
@@ -357,8 +357,19 @@ int main (int argc, char** argv) {
     }
 
     // Attach to IPU device
-    auto device = getDevice(options);
-    auto &target = device.getTarget();
+    poplar::Device device;
+    poplar::Target target;
+    poplar::OptionFlags opt;
+
+    opt.set("ipuLinkDomainSize", "64");
+
+    if (options.compile_only==true){
+        target = poplar::Target::createIPUTarget(options.num_ipus, "IPU-POD16",opt);
+    }else{
+        device = getDevice(options);
+        target = device.getTarget();
+    }
+    
     options.num_tiles_available = target.getNumTiles();
     options.tiles_per_ipu = options.num_tiles_available / options.num_ipus;
     workDivision(options);
@@ -376,11 +387,11 @@ int main (int argc, char** argv) {
     std::vector<float> cpu_results(total_volume);
 
     // initialize initial values for damp_coef vp_coef and initial_values
-    options.dt = getDt();
-    options.num_iterations = getSteps()-1;
-    std::vector<std::vector<std::vector<float>>> original_damp = getValues("damp");
-    std::vector<std::vector<std::vector<float>>> original_vp = getValues("vp");
-    std::vector<std::vector<std::vector<float>>> original_u = getValues("u");
+    options.dt = getDt(options);
+    options.num_iterations = getSteps(options)-1;
+    std::vector<std::vector<std::vector<float>>> original_damp = getValues("damp",options);
+    std::vector<std::vector<std::vector<float>>> original_vp = getValues("vp",options);
+    std::vector<std::vector<std::vector<float>>> original_u = getValues("u",options);
     
     // for (std::size_t i = 0; i < total_volume; ++i)  
     //   initial_values[i] = 0.0f ;//randomFloat();
@@ -406,17 +417,35 @@ int main (int argc, char** argv) {
     
     // perform CPU execution (and later compute MSE in IPU vs. CPU execution)
     if (options.cpu) 
-      cpu_results = WaveEquationCpu(initial_values, damp_coef, vp_coef, options);
+      getCpuResult(cpu_results,options);
     
     // Setup of programs, graph and engine
-    auto programs = createIpuPrograms(graph, options, damp_coef, vp_coef);
-    auto exe = poplar::compileGraph(graph, programs);
+    std::vector<poplar::program::Program> programs;
+    if (!options.load_exe){
+      programs = createIpuPrograms(graph, options, damp_coef, vp_coef);
+    }
+
+    std::string name = "ipu" + std::to_string(options.num_ipus) + "_" + std::to_string(options.height) + "_" + std::to_string(options.num_iterations) ;
+    if(options.compile_only==true){
+      auto exe = poplar::compileGraph(graph, programs);
+      saveExe(exe,name);
+      return EXIT_SUCCESS;
+    }
+
+    poplar::Executable exe;
+    if(options.load_exe==true){
+      exe = loadExe(name);
+    }else{
+      exe = poplar::compileGraph(graph, programs);
+      saveExe(exe,name);
+    }
+
     poplar::Engine engine(std::move(exe));
     engine.connectStream("host_to_device_stream", &initial_values[0], &initial_values[total_volume]);
     engine.connectStream("device_to_host_stream", &ipu_results[0], &ipu_results[total_volume]);
     engine.load(device);
 
-    std::size_t num_program_steps = programs.size();
+    // std::size_t num_program_steps = programs.size();
     auto stream_start = std::chrono::steady_clock::now();
     engine.run(0); // stream data to device
     auto exe_start = std::chrono::steady_clock::now();
@@ -434,12 +463,13 @@ int main (int argc, char** argv) {
     auto stream_time = (stream_time_in>>1) + (stream_time_out>>1);
 
     printResults(options, wall_time,stream_time);
-    saveMatrixToJson(ipu_results,options,"ipu");
-    std::cerr << "\nNorm u       = " << std::setprecision(15) << norm(ipu_results,options);
-    std::cerr << "\n";
+
+    std::string file_name = std::to_string(options.height) + "x" + std::to_string(getNt(options));
+    saveMatrixToJson(ipu_results,options,file_name);
+    std::cout << "\nNorm u       = " << std::setprecision(15) << norm(ipu_results,options);
+    std::cout << "\n";
 
     if (options.cpu) { 
-        saveMatrixToJson(cpu_results,options,"cpu");
         printNorms(ipu_results, cpu_results, options);
         printMeanSquaredError(ipu_results, cpu_results, options);
     }

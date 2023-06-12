@@ -8,7 +8,7 @@ import codecs, json
 import argparse
 
 import os
-# os.system('/usr/bin/Xvfb :99 -screen 0 1024x768x24 &')
+os.system('/usr/bin/Xvfb :99 -screen 0 1024x768x24 &')
 os.environ['DISPLAY'] = ':99'
 
 import panel as pn
@@ -17,7 +17,9 @@ pn.extension('vtk')
 
 parser = argparse.ArgumentParser(description='Process arguments.')
 
-parser.add_argument("-name", "--name", default="ipu", type=str, 
+parser.add_argument("-src", "--src", default="./output/", type=str, 
+                    help="path to seach for 'name'")
+parser.add_argument("-name", "--name", default="240x3000", type=str, 
                     help="name of grid data")
 
 args = parser.parse_args()
@@ -46,14 +48,13 @@ def plot_3dfunc(u):
     # vistagrid.plot(show_edges=True)
     # vistaslices.plot(cmap=cmap)
 
-file_path = f"./json/{args.name}.json"
+file_path = f"{args.src}{args.name}.json"
 obj_text = codecs.open(file_path, 'r', encoding='utf-8').read()
 data = json.loads(obj_text) #This reads json to list
 data_np = np.array(data)      #This converts to numpy
 
-if (data_np.ndim==1):
-    data_grid = data_np.reshape(31,31,31)
-elif (data_np.ndim==3):
+
+if (data_np.ndim==3):
     data_grid = data_np
 else:
     data_grid = data_np[0,:,:,:]
@@ -62,5 +63,5 @@ else:
 # file_path = "./iter10_reshaped.json" ## your path variable
 # json.dump(b, codecs.open(file_path, 'w', encoding='utf-8'), separators=(',', ':'), sort_keys=True, indent=4)
 
-print(data_grid)
+# print(data_grid)
 plot_3dfunc(data_grid)
