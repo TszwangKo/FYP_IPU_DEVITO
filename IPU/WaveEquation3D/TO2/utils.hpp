@@ -344,11 +344,11 @@ void saveMatrixToJson (
     utils::Options &options,
     std::string file_name) {
 
-    std::vector<std::vector<std::vector<float>>> matrix_3D (options.height, std::vector<std::vector<float>>(options.width, std::vector<float>(options.depth)));
-    for ( int x = 0; x < options.height ; x++ ){
-        for( int y = 0 ; y < options.width ; y++ ){
-            for (int z = 0 ; z < options.depth ; z++ ){
-                matrix_3D[x][y][z] = matrix[index(x,y,z,options.width,options.depth)];
+    std::vector<std::vector<std::vector<float>>> matrix_3D (options.height-options.padding*2, std::vector<std::vector<float>>(options.width-options.padding*2, std::vector<float>(options.depth-options.padding*2)));
+    for ( int x = options.padding; x < options.height-options.padding ; x++ ){
+        for( int y = options.padding ; y < options.width-options.padding ; y++ ){
+            for (int z = options.padding  ; z < options.depth-options.padding ; z++ ){
+                matrix_3D[x-options.padding][y-options.padding][z-options.padding] = matrix[index(x,y,z,options.width,options.depth)];
             }
         }
     }
@@ -412,9 +412,9 @@ double norm(
   std::size_t w = options.width;
   std::size_t d = options.depth;
   
-  for (std::size_t x = 0; x < h ; ++x) {
-    for (std::size_t y = 0; y < w ; ++y) { 
-      for (std::size_t z = 0; z < d ; ++z) {
+  for (std::size_t x = 0+options.padding; x < h - options.padding ; ++x) {
+    for (std::size_t y = 0 + options.padding; y < w - options.padding; ++y) { 
+      for (std::size_t z = 0 + options.padding; z < d - options.padding; ++z) {
             norm += a[index(x,y,z,w,d)]*a[index(x,y,z,w,d)];
       }
     }
@@ -472,7 +472,7 @@ void printResults(utils::Options &options, double wall_time, double stream_time)
 }
 
 std::vector<std::vector<std::vector<float>>> getValues(std::string key,utils::Options &options){
-    std::string file_name = "./devito/parameters_" + std::to_string(options.height) + ".json";
+    std::string file_name = "./devito/parameters_" + std::to_string(options.height) + "_" + std::to_string(options.nt) + ".json";
     std::ifstream ifs(file_name);
     json jf = json::parse(ifs);
 
@@ -513,6 +513,7 @@ int getNt(utils::Options &options){
 
 std::vector<float> getShape(utils::Options &options){
     std::string file_name = "./devito/parameters_" + std::to_string(options.height) + "_" + std::to_string(options.nt) + ".json";
+    std::cout << file_name << std::endl;
     std::ifstream ifs(file_name);
     json jf = json::parse(ifs);
 

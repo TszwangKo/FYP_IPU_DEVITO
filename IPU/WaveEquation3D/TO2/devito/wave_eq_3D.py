@@ -10,7 +10,7 @@ import argparse
 import os
 import sys
 
-# os.system('/usr/bin/Xvfb :99 -screen 0 1024x768x24 &')
+os.system('/usr/bin/Xvfb :99 -screen 0 1024x768x24 &')
 os.environ['DISPLAY'] = ':99'
 
 import panel as pn

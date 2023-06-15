@@ -327,7 +327,7 @@ int main (int argc, char** argv) {
   try {
     // Get options from command line arguments / defaults. (see utils.hpp)
     auto options = utils::parseOptions(argc, argv);
-
+    std::cout << "./devito/parameters_" + std::to_string(options.height) + "_" + std::to_string(options.nt) + ".json";
     // Set up of 3D mesh properties
     std::size_t base_length = 320;
     options.side = side_length(options.num_ipus, base_length);
@@ -380,15 +380,16 @@ int main (int argc, char** argv) {
     
     std::size_t inner_volume = (options.height - 2) * (options.width - 2) * (options.depth - 2);
     std::size_t total_volume = (options.height * options.width * options.depth);
-    std::vector<float> ipu_results(total_volume); 
-    std::vector<float> initial_values(total_volume);
-    std::vector<float> damp_coef(total_volume); // damp coefficient
-    std::vector<float> vp_coef(total_volume); // velocity profile coefficient
-    std::vector<float> cpu_results(total_volume);
+    std::vector<float> ipu_results(total_volume,0.0f); 
+    std::vector<float> initial_values(total_volume,0.0f);
+    std::vector<float> damp_coef(total_volume,0.0f); // damp coefficient
+    std::vector<float> vp_coef(total_volume,0.0f); // velocity profile coefficient
+    std::vector<float> cpu_results(total_volume,0.0f);
 
     // initialize initial values for damp_coef vp_coef and initial_values
     options.dt = getDt(options);
-    options.num_iterations = getSteps(options)-1;
+    options.num_iterations = getSteps(options);
+    std::cerr << options.num_iterations << std::endl;
     std::vector<std::vector<std::vector<float>>> original_damp = getValues("damp",options);
     std::vector<std::vector<std::vector<float>>> original_vp = getValues("vp",options);
     std::vector<std::vector<std::vector<float>>> original_u = getValues("u",options);
@@ -399,19 +400,17 @@ int main (int argc, char** argv) {
     // initial_values[index(options.height/2,options.width/2,20,options.width,options.depth)] = 0.1f;  
       
   
-    for ( int x = 0; x < options.height ; x++ ){
-        for( int y = 0 ; y < options.width ; y++ ){
-            for (int z = 0 ; z < options.depth ; z++ ){
-                damp_coef[index(x,y,z,options.width,options.depth)] = original_damp[x][y][z];
-                vp_coef[index(x,y,z,options.width,options.depth)] = original_vp[x][y][z];
-                initial_values[index(x,y,z,options.width,options.depth)] = original_u[x][y][z];
-            }
+    for ( int x = options.padding; x < options.height-options.padding ; x++ ){
+        for( int y = options.padding ; y < options.width-options.padding ; y++ ){
+            for (int z = options.padding  ; z < options.depth-options.padding ; z++ ){
+                damp_coef[index(x,y,z,options.width,options.depth)] = original_damp[x-options.padding][y-options.padding][z-options.padding];
+                vp_coef[index(x,y,z,options.width,options.depth)] = original_vp[x-options.padding][y-options.padding][z-options.padding];
+                initial_values[index(x,y,z,options.width,options.depth)] = original_u[x-options.padding][y-options.padding][z-options.padding];
+                if(original_vp[x-options.padding][y-options.padding][z-options.padding] == 0.0f){
+                  std::cerr << "vp_coeff must not be 0!";
+                return -1;
         }
-    }
-    for ( auto& number : vp_coef){
-        if(number == 0.0f){
-            std::cerr << "vp_coeff must not be 0!";
-            return -1;
+            }
         }
     }
     
@@ -425,7 +424,7 @@ int main (int argc, char** argv) {
       programs = createIpuPrograms(graph, options, damp_coef, vp_coef);
     }
 
-    std::string name = "ipu" + std::to_string(options.num_ipus) + "_" + std::to_string(options.height) + "_" + std::to_string(options.num_iterations) ;
+    std::string name = "ipu" + std::to_string(options.num_ipus) + "_" + std::to_string(options.height) + "_" + std::to_string(options.nt) ;
     if(options.compile_only==true){
       auto exe = poplar::compileGraph(graph, programs);
       saveExe(exe,name);
@@ -466,8 +465,8 @@ int main (int argc, char** argv) {
 
     std::string file_name = std::to_string(options.height) + "x" + std::to_string(getNt(options));
     saveMatrixToJson(ipu_results,options,file_name);
-    std::cout << "\nNorm u       = " << std::setprecision(15) << norm(ipu_results,options);
-    std::cout << "\n";
+    std::cerr << "\nNorm u       = " << std::setprecision(15) << norm(ipu_results,options);
+    std::cerr << "\n";
 
     if (options.cpu) { 
         printNorms(ipu_results, cpu_results, options);
