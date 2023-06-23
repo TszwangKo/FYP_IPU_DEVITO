@@ -438,11 +438,13 @@ void printResults(utils::Options &options, double wall_time, double stream_time)
   double inner_volume = (double) options.height * (double) options.width * (double) options.depth;
   double flops_per_element = 32.0;
   double flops = inner_volume * options.num_iterations * flops_per_element / wall_time;
+  double pts = inner_volume * options.num_iterations / wall_time;
   double internal_communication_ops = 2.0*(double)options.halo_volume*(double)options.num_ipus*options.padding; // communication ops per layer * layers of padding 
   double external_communication_ops = 4.0*(double)options.height*(double)options.width*(options.num_ipus - 1.0)*options.padding; // 2 load and 2 stores of a slice (partition along depth)
   double avg_load_store_per_element = 20.0;
   double bandwidth = (20.0*inner_volume + internal_communication_ops + external_communication_ops)*(double)options.num_iterations*sizeof(float)/wall_time;
   double tflops = flops*1e-12;
+  double gpts = pts*1e-9;
   double bandwidth_TB_s = bandwidth*1e-12;
 
   std::cout << "3D Isotropic Diffusion"
@@ -459,7 +461,7 @@ void printResults(utils::Options &options, double wall_time, double stream_time)
     << "\n"
     << "\nLaTeX Tabular Row"
     << "\n-----------------"
-    << "\nNo. IPUs & Grid    & No. Iterations & Exec Time [s] & Stream Time [s] & Throughput [TFLOPS] & Minimum Bandwidth [TB/s] \\\\\n" 
+    << "\nNo. IPUs & Grid    & No. Iterations & Exec Time [s] & Stream Time [s] & Throughput [TFLOPS] & Throughput [GFLOPS] & Minimum Bandwidth [TB/s] \\\\\n" 
     << std::left << std::fixed << std::setprecision(2)
     << std::setw(8) << options.num_ipus << " & "
     << "$" << options.height << "^3" "$ & " 
@@ -467,6 +469,7 @@ void printResults(utils::Options &options, double wall_time, double stream_time)
     << std::setw(13) << wall_time << " & " 
     << std::setw(15) << stream_time << " & " 
     << std::setw(19) << tflops << " & " 
+    << std::setw(19) << gpts << " & " 
     << std::setw(24) << bandwidth_TB_s << " \\\\"
     << "\n";
 }

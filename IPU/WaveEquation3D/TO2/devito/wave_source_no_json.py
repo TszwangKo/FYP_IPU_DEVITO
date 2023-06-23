@@ -2,24 +2,13 @@
 # Not using Devito's source injection abstraction
 import numpy as np
 from devito import TimeFunction, Eq, Operator, solve, norm
+from examples.seismic import RickerSource
 
 from examples.seismic import Model, TimeAxis
-import codecs, json 
-import argparse
 
 import os
-import sys
-
-os.system('/usr/bin/Xvfb :99 -screen 0 1024x768x24 &')
-os.environ['DISPLAY'] = ':99'
-
 import panel as pn
-pn.extension('vtk')
-
-import panel as pn
-
-
-
+import argparse
 
 parser = argparse.ArgumentParser(description='Process arguments.')
 
@@ -29,14 +18,14 @@ parser.add_argument("-so", "--space_order", default=4,
                     type=int, help="Space order of the simulation")
 parser.add_argument("-to", "--time_order", default=2,
                     type=int, help="Time order of the simulation")
-parser.add_argument("-nt", "--nt", default=40,
+parser.add_argument("-nt", "--nt", default=200,
                     type=int, help="Simulation time in millisecond")
 parser.add_argument("-bls", "--blevels", default=2, type=int, nargs="+",
                     help="Block levels")
 parser.add_argument("-plot", "--plot", default=False, type=bool, help="Plot3D")
 args = parser.parse_args()
 
-def plot_3dfunc(u):
+def plot_3dfunc(u,name):
     pn.extension('vtk')
     # Plot a 3D structured grid using pyvista
 
@@ -58,8 +47,7 @@ def plot_3dfunc(u):
     plotter = pv.Plotter(off_screen=True)
     color_range = abs(max(values.min(), values.max(), key=abs))
     plotter.add_mesh(vistaslices,cmap=cmap,clim=[-color_range,color_range])
-    plotter.show(screenshot=f'./ref.png') 
-
+    plotter.show(screenshot=f'./{name}.png') 
 
 # Define a physical size
 nx, ny, nz = args.shape
@@ -91,73 +79,71 @@ dt = model.critical_dt  # Time step from model grid spacing
 
 time_range = TimeAxis(start=t0, stop=tn, step=dt)
 
+# The source is positioned at a $20m$ depth and at the middle of the $x$ axis ($x_{src}=500m$), with a peak wavelet frequency of $10Hz$.
+f0 = 0.010  # Source peak frequency is 10Hz (0.010 kHz)
+src = RickerSource(name='src', grid=model.grid, f0=f0,
+                   npoint=1, time_range=time_range)
+
+# First, position source centrally in all dimensions, then set depth
+src.coordinates.data[0, :] = np.array(model.domain_size) * .5
+
+# We can plot the time signature to see the wavelet
+# src.show()
+
 # Define the wavefield with the size of the model and the time dimension
 u = TimeFunction(name="u", grid=model.grid, time_order=to, space_order=so)
 
 px, py, pz = u.shape[1:]
 
-# set initial value for t=0
-u.data[0, int(px/2), int(py/2), 20] = 10.0
-
-export_u0 = u.data[0,:,:,:].copy()
-export_u1 = u.data[1,:,:,:].copy()
-export_u2 = u.data[2,:,:,:].copy()
-
-
+u.data[0, int(px/2), int(py/2), -20] = 1.0
 # We can now write the PDE
 pde = model.m * u.dt2 - u.laplace + model.damp * u.dt
 
 # The PDE representation is as on paper
-# print(pde)
-# print(solve(pde, u.forward))
+pde
 
 stencil = Eq(u.forward, solve(pde, u.forward))
 stencil
 
-op = Operator([stencil], subs=model.spacing_map)
-op.apply(time=time_range.num-1, dt=model.critical_dt)
-# op.apply(time=time_range.num-1, dt=model.critical_dt, **{'x0_blk0_size': 16, 'y0_blk0_size': 8})
+# Finally we define the source injection and receiver read function to generate the corresponding code
+src_term = src.inject(field=u.forward, expr=src * dt**2 / model.m)
+op = Operator([stencil] + src_term, subs=model.spacing_map)
 
-# print(f"dt              = {dt:0,.15f}",file=sys.stderr)
-print(f"number of steps = ",int(np.ceil((nt - t0 + dt)/dt))-1,file=sys.stderr)
-print(f"u (shape)       = ", u.shape,file=sys.stderr)
-print(f"norm u[0]       =  {np.linalg.norm(u.data[0,:,:,:]):0,.15f}",file=sys.stderr)
-print(f"norm u[1]       =  {np.linalg.norm(u.data[1,:,:,:]):0,.15f}",file=sys.stderr)
-print(f"norm u[2]       =  {np.linalg.norm(u.data[2,:,:,:]):0,.15f}",file=sys.stderr)
-
-b = model.damp.data.tolist() # nested lists with same data, indices
-#    Obviously, if you already have list, you don't/can't .tolist() it
-file_path = "damp.json" ## your path variable
-json.dump(b, codecs.open(file_path, 'w', encoding='utf-8'), separators=(',', ':'), sort_keys=True, indent=4) ### this saves the array in .json format
+# Run with source and plot
+op.apply(time=50, dt=model.critical_dt)
 
 
-b = u.data[0].tolist() # nested lists with same data, indices
-file_path = f"./output/{u.shape[1]}x{nt}.json" ## your path variable
-json.dump(b, codecs.open(file_path, 'w', encoding='utf-8'), 
-          separators=(',', ':'), 
-          sort_keys=True, 
-          indent=4) ### this saves the array in .json format
 
 parameters = {
   "dt": float(dt),
   "nt": int(nt),
-  "steps": int(np.ceil((nt - t0 + dt)/dt))-1,
-  "shape": [float(model.damp.shape[0]),float(model.damp.shape[1]),float(model.damp.shape[2])],
+  "steps": time_range.num ,
+  "shape": [float(model.damp.shape[0]+so),float(model.damp.shape[1]+so),float(model.damp.shape[2]+so)],
   "damp": model.damp.data.tolist(),
   "vp": model.vp.data.tolist(),
-  "u0": export_u0.data.tolist(),
-  "u1": export_u1.data.tolist(),
-  "u2": export_u2.data.tolist()
+  "u0": u.data[0].tolist(),
+  "u1": u.data[1].tolist(),
+  "u2": u.data[2].tolist()
 }
 
-json_object = json.dumps(parameters, indent=4)
+print(f"STEPS: {time_range.num}")
+
+
  
-# Writing to sample.json
-with open(f"parameters_{u.shape[1]+so}_{nt}.json", "w") as outfile:
-    outfile.write(json_object)
+
+    
+if args.plot:
+    plot_3dfunc(u,"init")
+
+op = Operator([stencil], subs=model.spacing_map)
+
+# Run more and pliot again
+op.apply(time=time_range.num, dt=model.critical_dt)
+
 
 if args.plot:
-    plot_3dfunc(u)
+    plot_3dfunc(u,"ref")
 
-# #plot_image(u.data[0,:,:,10], cmap="viridis")
-# #plt.show()
+
+
+print(np.linalg.norm(u.data[(time_range.num+1)%3,:,:,:]))

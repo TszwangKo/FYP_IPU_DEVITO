@@ -40,6 +40,10 @@ poplar::ComputeSet createComputeSet(
   const float hy = 2.0f/(options.width-2*options.padding-1);
   const float hz = 2.0f/(options.depth-2*options.padding-1);
   const float dt = 0.25f * hx * hy * hz / options.alpha;
+  const float r0 = 1.0F / dt;
+  const float r1 = 1.0F / (hx * hx);
+  const float r2 = 1.0F / (hy * hy);
+  const float r3 = 1.0F / (hz * hz);
 
   for (std::size_t ipu = 0; ipu < options.num_ipus; ++ipu) {
       
@@ -128,6 +132,10 @@ poplar::ComputeSet createComputeSet(
               graph.setInitialValue(v["hy"], hy);
               graph.setInitialValue(v["hz"], hz);
               graph.setInitialValue(v["dt"], dt);
+              graph.setInitialValue(v["r0"], r0);
+              graph.setInitialValue(v["r1"], r1);
+              graph.setInitialValue(v["r2"], r2);
+              graph.setInitialValue(v["r3"], r3);
               graph.setTileMapping(v, tile_id);
             }
           }
@@ -305,17 +313,22 @@ int main (int argc, char** argv) {
     std::size_t inner_volume = (options.height - 2) * (options.width - 2) * (options.depth - 2);
     std::size_t total_volume = (options.height * options.width * options.depth);
     std::vector<float> ipu_results(total_volume); 
-    std::vector<float> initial_values(total_volume);
+    std::vector<float> initial_values(total_volume,0);
     std::vector<float> cpu_results(total_volume);
 
     // initialize initial values with random floats
-    for (std::size_t i = 0; i < total_volume/2; ++i)
-      initial_values[i] = 0.0f ;//randomFloat();
-    for (std::size_t i=total_volume/2 ; i < total_volume; ++i)
-      initial_values[i] = 0.0f ;//randomFloat();
+    // for (std::size_t i = 0; i < total_volume/2; ++i)
+    //   initial_values[i] = 0.0f ;//randomFloat();
+    // for (std::size_t i=total_volume/2 ; i < total_volume; ++i)
+    //   initial_values[i] = 0.0f ;//randomFloat();
     
-    initial_values[index(int(options.padding+(3*(options.height-2*options.padding)/4)),int(options.width/2),int(options.width/2),options.width,options.depth)] = 1.0f ;//randomFloat();
-      
+    for (int i = int(options.padding+(3*(options.height-2*options.padding)/4)) - 10 ; i < int(options.padding+(3*(options.height-2*options.padding)/4)) + 10 ; i++){
+      for (int j = int(options.width/2) - 10 ; j < int(options.width/2)  + 10 ; j++){
+        for (int k = int(options.depth/2) - 10 ; k < int(options.depth/2)  + 10 ; k++){
+          initial_values[index(i,j,k,options.width,options.depth)] = 1.0f ;//randomFloat();
+        }
+      }
+    }
     // perform CPU execution (and later compute MSE in IPU vs. CPU execution)
     saveMatrixToJson(initial_values,options,"initial_value_ipu");
     if (options.cpu) 

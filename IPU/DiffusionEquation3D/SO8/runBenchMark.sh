@@ -6,7 +6,7 @@ mkdir -p BenchMarks
 
 ITERATION=1000
 
-SIDE_ARRAY=( 0 340 413 0 509 )
+SIDE_ARRAY=( 0 320 400 0 480 )
 for i in  1 2 4 
 do
    INNER_SIDE_LENGTH=${SIDE_ARRAY[i]}

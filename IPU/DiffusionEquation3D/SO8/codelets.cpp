@@ -17,6 +17,10 @@ public:
   const float hy;
   const float hz;
   const float dt;
+  const float r0;
+  const float r1;
+  const float r2;
+  const float r3;
 
   unsigned idx(unsigned x, unsigned y, unsigned w) {
     /* The index corresponding to [x,y] in for a row-wise flattened 2D variable*/
@@ -24,12 +28,6 @@ public:
   } 
 
   bool compute () {
-
-    const float r0 = 1.0F / dt;
-    const float r1 = 1.0F / (hx * hx);
-    const float r2 = 1.0F / (hy * hy);
-    const float r3 = 1.0F / (hz * hz);
-    
     const unsigned padded_width = worker_width + 2*padding ; 
 
     for (std::size_t x = padding; x < worker_height + padding; ++x) {

@@ -38,6 +38,9 @@ poplar::ComputeSet createComputeSet(
   std::size_t padding = options.padding;
   std::size_t halo_volume = 0;
 
+  const float r0 = 1.0f/(options.dt*options.dt);
+  const float r1 = 1.0f/options.dt;
+
   for (std::size_t ipu = 0; ipu < options.num_ipus; ++ipu) {
       
     // TODO: Make an inline function for this for various space order (amount of overlap between IPU)
@@ -183,7 +186,8 @@ poplar::ComputeSet createComputeSet(
               graph.setInitialValue(v["worker_width"], y_high - y_low);
               graph.setInitialValue(v["worker_depth"], z_high - z_low);
               graph.setInitialValue(v["padding"], padding);
-              graph.setInitialValue(v["dt"], options.dt);
+              graph.setInitialValue(v["r0"], r0);
+              graph.setInitialValue(v["r1"], r1);
               graph.setTileMapping(v, tile_id);
             }
           }
@@ -271,7 +275,9 @@ std::vector<poplar::program::Program> createIpuPrograms(
 
   // Define data streams
   std::size_t volume = options.height*options.width*options.depth;
-  auto host_to_device = graph.addHostToDeviceFIFO("host_to_device_stream", poplar::FLOAT, volume);
+  auto host_to_device0 = graph.addHostToDeviceFIFO("host_to_device_stream0", poplar::FLOAT, volume);
+  auto host_to_device1 = graph.addHostToDeviceFIFO("host_to_device_stream1", poplar::FLOAT, volume);
+  auto host_to_device2 = graph.addHostToDeviceFIFO("host_to_device_stream2", poplar::FLOAT, volume);
   auto device_to_host = graph.addDeviceToHostFIFO("device_to_host_stream", poplar::FLOAT, volume);
   
   
@@ -279,16 +285,29 @@ std::vector<poplar::program::Program> createIpuPrograms(
   std::vector<poplar::program::Program> programs;
 
   // Program 0: move content of initial_values into both device variables a and b
-  const poplar::Tensor* u0;
+  const poplar::Tensor* t0;
+  const poplar::Tensor* t1;
+  const poplar::Tensor* t2;
   if (options.num_iterations % 3 == 1) {  
-    u0 = &a;
+    t0 = &a;
+    t1 = &c;
+    t2 = &b;
   } else if (options.num_iterations % 3 == 2) {
-    u0 = &c;
+    t0 = &c;
+    t1 = &b;
+    t2 = &a;
   } else {
-    u0 = &b;
+    t0 = &b;
+    t1 = &a;
+    t2 = &c;
   }
+
   programs.push_back(
-      poplar::program::Copy(host_to_device, *u0) // initial_values to 
+      poplar::program::Sequence{
+        poplar::program::Copy(host_to_device0, *t0), // initial_values0 to u0
+        poplar::program::Copy(host_to_device1, *t1), // initial_values1 to u1
+        poplar::program::Copy(host_to_device2, *t2)  // initial_values2 to u2
+      }
   );
 
   //* Create compute sets (2nd Time order requires 3 compute sets)
@@ -381,7 +400,9 @@ int main (int argc, char** argv) {
     std::size_t inner_volume = (options.height - 2) * (options.width - 2) * (options.depth - 2);
     std::size_t total_volume = (options.height * options.width * options.depth);
     std::vector<float> ipu_results(total_volume,0.0f); 
-    std::vector<float> initial_values(total_volume,0.0f);
+    std::vector<float> initial_values0(total_volume,0.0f);
+    std::vector<float> initial_values1(total_volume,0.0f);
+    std::vector<float> initial_values2(total_volume,0.0f);
     std::vector<float> damp_coef(total_volume,0.0f); // damp coefficient
     std::vector<float> vp_coef(total_volume,0.0f); // velocity profile coefficient
     std::vector<float> cpu_results(total_volume,0.0f);
@@ -392,7 +413,9 @@ int main (int argc, char** argv) {
     std::cerr << options.num_iterations << std::endl;
     std::vector<std::vector<std::vector<float>>> original_damp = getValues("damp",options);
     std::vector<std::vector<std::vector<float>>> original_vp = getValues("vp",options);
-    std::vector<std::vector<std::vector<float>>> original_u = getValues("u",options);
+    std::vector<std::vector<std::vector<float>>> original_u0 = getValues("u0",options);
+    std::vector<std::vector<std::vector<float>>> original_u1 = getValues("u1",options);
+    std::vector<std::vector<std::vector<float>>> original_u2 = getValues("u2",options);
     
     // for (std::size_t i = 0; i < total_volume; ++i)  
     //   initial_values[i] = 0.0f ;//randomFloat();
@@ -405,7 +428,9 @@ int main (int argc, char** argv) {
             for (int z = options.padding  ; z < options.depth-options.padding ; z++ ){
                 damp_coef[index(x,y,z,options.width,options.depth)] = original_damp[x-options.padding][y-options.padding][z-options.padding];
                 vp_coef[index(x,y,z,options.width,options.depth)] = original_vp[x-options.padding][y-options.padding][z-options.padding];
-                initial_values[index(x,y,z,options.width,options.depth)] = original_u[x-options.padding][y-options.padding][z-options.padding];
+                initial_values0[index(x,y,z,options.width,options.depth)] = original_u0[x-options.padding][y-options.padding][z-options.padding];
+                initial_values1[index(x,y,z,options.width,options.depth)] = original_u1[x-options.padding][y-options.padding][z-options.padding];
+                initial_values2[index(x,y,z,options.width,options.depth)] = original_u2[x-options.padding][y-options.padding][z-options.padding];
                 if(original_vp[x-options.padding][y-options.padding][z-options.padding] == 0.0f){
                   std::cerr << "vp_coeff must not be 0!";
                 return -1;
@@ -431,6 +456,7 @@ int main (int argc, char** argv) {
       return EXIT_SUCCESS;
     }
 
+    
     poplar::Executable exe;
     if(options.load_exe==true){
       exe = loadExe(name);
@@ -440,7 +466,9 @@ int main (int argc, char** argv) {
     }
 
     poplar::Engine engine(std::move(exe));
-    engine.connectStream("host_to_device_stream", &initial_values[0], &initial_values[total_volume]);
+    engine.connectStream("host_to_device_stream0", &initial_values0[0], &initial_values0[total_volume]);
+    engine.connectStream("host_to_device_stream1", &initial_values1[0], &initial_values1[total_volume]);
+    engine.connectStream("host_to_device_stream2", &initial_values2[0], &initial_values2[total_volume]);
     engine.connectStream("device_to_host_stream", &ipu_results[0], &ipu_results[total_volume]);
     engine.load(device);
 

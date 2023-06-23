@@ -40,6 +40,10 @@ poplar::ComputeSet createComputeSet(
   const float hy = 2.0f/(options.width-2*options.padding-1);
   const float hz = 2.0f/(options.depth-2*options.padding-1);
   const float dt = 0.25f * hx * hy * hz / options.alpha;
+  const float r0 = 1.0F / dt;
+  const float r1 = 1.0F / (hx * hx);
+  const float r2 = 1.0F / (hy * hy);
+  const float r3 = 1.0F / (hz * hz);
 
   for (std::size_t ipu = 0; ipu < options.num_ipus; ++ipu) {
       
@@ -128,6 +132,10 @@ poplar::ComputeSet createComputeSet(
               graph.setInitialValue(v["hy"], hy);
               graph.setInitialValue(v["hz"], hz);
               graph.setInitialValue(v["dt"], dt);
+              graph.setInitialValue(v["r0"], r0);
+              graph.setInitialValue(v["r1"], r1);
+              graph.setInitialValue(v["r2"], r2);
+              graph.setInitialValue(v["r3"], r3);
               graph.setTileMapping(v, tile_id);
             }
           }

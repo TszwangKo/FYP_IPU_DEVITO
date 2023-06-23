@@ -79,7 +79,7 @@ grid = Grid(shape=(nx, ny, nz), extent=(2., 2., 2.))
 u = TimeFunction(name='u', grid=grid, space_order=so)
 # init_hat(field=u.data[0], dx=dx, dy=dy, value=2.)
 u.data[:, :, :, :] = 0
-u.data[:, int(3*nx/4), int(ny/2), int(nz/2)] = 1
+u.data[:, int(3*nx/4)-10:int(3*nx/4)+10, int(ny/2)-10:int(ny/2)+10, int(nz/2)-10:int(nz/2)+10] = 1
 
 
 dump_json(u,"initial_value")
@@ -116,7 +116,7 @@ print(nt)
 # Apply the operator for a number of timesteps
 op(time=nt, dt=dt, a=nu)
 
-print(u.shape)
+print(np.linalg.norm(u.data[0,:,:,:]))
 # print("nt+dt/dt gives :",int((nt+dt)/dt))
 if args.plot:
     plot_3dfunc(u)

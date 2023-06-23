@@ -16,7 +16,9 @@ public:
   const unsigned worker_width;
   const unsigned worker_depth;
   const unsigned padding;
-  const float dt;
+  const float r0;
+  const float r1;
+
   unsigned idx(unsigned x, unsigned y, unsigned w)
   {
     /* The index corresponding to [x,y] in for a row-wise flattened 2D variable*/
@@ -25,8 +27,6 @@ public:
 
   bool compute()
   {
-    const float r0 = 1.0f/(dt*dt);
-    const float r1 = 1.0f/dt;
     auto& t0 = in1;
     auto& t1 = in2;
     auto& t2 = out;
@@ -75,7 +75,8 @@ public:
   const unsigned worker_width;
   const unsigned worker_depth;
   const unsigned padding;
-  const float dt;
+  const float r0;
+  const float r1;
 
   unsigned idx(unsigned x, unsigned y, unsigned w)
   {
@@ -85,9 +86,6 @@ public:
 
   bool compute()
   {
-    const float r0 = 1.0f/(dt*dt);
-    const float r1 = 1.0f/dt;
-
     auto& t0 = in1;
     auto& t1 = in2;
     auto& t2 = out;
