@@ -1,3 +1,0 @@
-#!/bin/bash
-
-DEVITO_ARCH=clang DEVITO_PLATFORM=arm DEVITO_LANGUAGE=openmp DEVITO_LOGGING=DEBUG python3 wave_eq_3D.py
