@@ -1,61 +1,182 @@
-# General Scientific Computing Workloads on the IPU
+# Exploiting Graphcore IPU for Finite Stencil Computation
 
-Computational workloads from general scientific computing have been solved on the [intelligence processing unit](https://www.graphcore.ai/products/ipu) (IPU). This work is part of a master's thesis with University of Oslo (UiO) and Simula, submitted October 2021.
+2 Partial Differential Equations: The Diffusion Equation and Wave Equation were implmented on the Graphcore [IPU](https://www.graphcore.ai/products/ipu). This work is part of a Final Year Project with Imperial College London, submitted June 2023. It references and builds on top of the work of [Simon Hapnås](https://github.com/simehaa/IPU).
 
-## Contents
 
-* The **Aliev-Panfilov model** is a set of PDEs which model propagation of electric potentials in cardiac tissues. A numerical algorithm, derived by using the forward-Euler solution, was implemented on the IPU and applied on a 2D mesh.
-* The **2D heat equation** is a PDE which describes propagation of heat. It was discretized by finite differences, more specifically the explicit scheme found by employing the *forward difference in time* and the *central difference in space*. This became a 5-point stencil-based algorithm, which was applied on a 2D mesh on the IPU.
-* The **3D heat equation** extended the heat eq. to 3D meshes. It was implemented as a 7-point stencil-based algorithm for the IPU.
-* The [STREAM Triad](http://www.cs.virginia.edu/stream/) benchmark is a common benchmark for CPUs, which solves the kernel `a[i] = b[i] + q*c[i]`. It was implemented as a guide to getting started with IPU programming and served as a benchmark for the peak performance of the IPU.
+# Get-Started
 
-The 2D and 3D heat equation codes were specifically implemented to be used on both single-IPU and multi-IPU executions.
+Two Partial Differential Equations (PDEs) were implemented for the IPU with the help of the [Devito](https://www.devitoproject.org/) Compiler
 
-## Abstract
+Within `DiffusionEquation2D` contains folder `SO2` `SO4` `SO8`. A `runBenchMark.sh` is included within each folder to run the experiments documented below. Results are stored in the respective `BenchMarks` folder.
 
-*The emergence of specialized processors in recent years has largely been driven by providing high computational performance for artificial intelligence (AI) workloads. However, these technological advancements are also of interest for high performance computing (HPC) for general scientific applications. In this thesis, selected stencil-based numerical schemes for solving PDEs have been implemented for execution on the Graphcore IPU, a processor with 1,472 cores and distributed memory chunks of 624 kB located near each core.*
+Within `DiffusionEquation2D` contains a folder `TO2`. A `runBenchMark.sh` is also included, in addition readers use `-i` to re-run IPU results using stored graphs and parameters; `-p` to plot results for the experiment ran; `-t` to run a mini scale program; `-r` to remove all the file generated in the process. Results are stored in the respective `BenchMarks` folder.
 
-*The heat equation was solved on the IPU for structured 2D, and 3D meshes. The computations and problem sizes were scaled to execute in parallel on up to 16 IPUs. For all executions, the problem size pushed the limit of the available on-chip memory. Additionally, the PDE system of the Aliev-Panfilov model for cardiac excitation was solved for a structured 2D mesh, to demonstrate the IPU's applicability of a real-life physics-based application. The computations involved iteratively applying 5-point and 7-point stencils, for the 2D and 3D systems, respectively. The IPU was demonstrated to achieve remarkable performances, achieving a throughput of up to 1.44 TFLOPS. Careful programming led to an effective use of the distributed in-processor memory of the IPU, which is designed to provide high memory bandwidth. The 3D heat equation reached 5.15 TB/s memory bandwidth on one IPU.*
+## Required Packages
+Install the following required packages (or run `./requiredMod.sh`)
+```
+sudo apt-get update
+sudo apt-get install software-properties-common protobuf-compiler  -y
+sudo apt-get install build-essential g++ python3-dev autotools-dev libicu-dev libbz2-dev libboost-all-dev -y
+sudo apt-get install python3.8-venv screen -y
+```
+For the Wave Equation, 2 additional packeges are needed. Follow the link below to complete installation
 
-*The extension to multi-IPU computations also showed performances consistent with the scalable design of IPU systems, so-called IPU-PODs. The scaling of the 3D problem showed a slight decrease in performance per core, whereas the scaling of the 2D problem maintained its performance per core on the multi-IPU executions. Therefore, the multi-IPU performance of the 2D heat equation achieved a better speedup than its 3D counterpart, while both showed performance increases that scaled well. This thesis demonstrates an attempt to apply a specialized AI-processor to selected general scientific computing workloads. In this context, the advantages, challenges, and weaknesses of employing the IPU have been discussed*
+**Devito Compiler**:
+https://www.devitoproject.org/devito/download.html
 
-## Results
+**nlohmann JSON library**: https://github.com/nlohmann/json 
 
-### Hardware and Software Versions
-The algorithms were implemented and executed on two processors:
-| Processor                      | Language   | Software framework | Cores | Threads | Compiler            |
-| ------------------------------ |:---------- | ------------------ | ----- | ------- | ------------------- |
-| Two AMD Epyc 7601 32-core CPUs | Standard C | OpenMP 4.5         | 64    | 128     | GCC 11.1.0 with -O3 |
-| One Colossus GC200 MK2 IPU     | C++        | Poplar SDK 2.2.0   | 1472  | 8832    | GCC 7.5.0 with -O3  |
+fornholmann JSON library, using `cget` might be the easiest installation. the following might also be useful in getting Makefile to recognise the library.
 
+>Pkg-config
+>If you are using bare Makefiles, you can use pkg-config to generate the include flags that point to where the library is installed:
+>
+>```pkg-config nlohmann_json --cflags```
+
+
+
+# Abstract
+
+*Stencil computation is essential in numerically solving Partial Differential Equations (PDE). It is
+often used in engineering context and presents a major opportunity for optimisation due to the vast
+amount of computation it requires. Improving the time required to solve stencil computation has
+huge potential to enable new applications. Improvement of hardware is one of the main contrib-
+utors to improving stencil computation. This project investigates the potential of the Intelligent
+Processing Unit (IPU) in improving stencil computation.*
+
+*The Intelligent Processing Unit (IPU) is a hardware architecture created by Graphcore. Its unique
+hardware architecture enables a combination of different parallelism techniques to be employed.
+On top of the traditional Single Instruction Multiple Data (SIMD), the fine-grained threaded model
+employed on modern multi-core CPUs, the fabric of tiles in a Graphcore IPU allows programs to
+be subdivided into subprograms, effectively enabling Multiple Instruction Multiple Data (MIMD),
+so that further parallelism can be achieved.*
+
+*Its uniqueness lies in the close proximity between the processor and its memory, which allows for
+extremely fast memory read and write. This project shows that for the diffusion computation on
+mesh with elements in the scale of a hundred million elements, the IPU is able to outperform all
+alternative hardware. The performance of the IPU is 59.5% better than the next best candidate,
+the NVIDIA RTX A6000. With a more complex wave equation, however, the IPU performs 3.7%
+worst than NVIDIA RTX A6000. The generalisation of the result to larger problems with different
+operational intensities is left as future work.*
+
+*The experiments revealed IPU’s notable weak and strong scaling capabilities. However, it was
+observed that the weak scaling capability is lacking when dealing with high memory density prob-
+lems. At the same time, space order is also found to have a greater influence on execution time
+than the total problem size.*
+
+*The project also highlights the challenges in coding an IPU machine. Specifically, the lack of nativesupport for higher-order arrays in the IPU poplar programming framework makes programming for
+higher-order tensors challenging. Moreover, there is a notable increase in control flow overhead as
+the time order of the problem grows, and the compile time exhibits poor scalability with increased
+space order.*
+
+
+# Expriment Setup
+## Hardware Setup
+### GPU
+| **Processor** | **GPU Architecture** | **NVIDIA Tensor Cores** | **NVIDIA CUDA® Cores** | **Memory Size** | **Memory Bandwidth** | **Memory Interface** |
+|---------------|---------------------|-------------------------|------------------------|-----------------|----------------------|----------------------|
+| GeForce RTX 3070 Ti | Ampere | 192 | 6144 | 8 GB | 600 GB/sec | 256-bit |
+| NVIDIA Tesla V100 | Volta | 640 | 5120 | 32GB/16GB HBM2 | 900 GB/sec | 4096-bit |
+| NVIDIA RTX A6000 | Ampere | 336 | 10,752 | 48 GB GDDR6 | 768 GB/sec | 384-bit |
+
+### Archer 2
+| Attributes    | Description    |
+|---------------|--------------|
+| **Processor** | Archer 2 |
+| **Nodes** | 5,860 nodes: 5,276 standard memory, 584 high memory |
+| **Processor** | 2× AMD EPYC™ 7742, 2.25 GHz, 64-core |
+| **Cores per node** | 128 (2× 64-core processors) |
+| **NUMA structure** | 8 NUMA regions per node (16 cores per NUMA region) |
+| **Memory per node**| 256 GiB (standard memory), 512 GiB (high memory) |
+| **Memory per core** | 2 GiB (standard memory), 4 GiB (high memory) |
+| **Interconnect** | HPE Cray Slingshot, 2× 100 Gbps bi-directional per node |
+
+### Intel(R) Core(TM) i7-10700KF CPU
+| Attribute                   | Description      |
+|-----------------------------|------------|
+| CPU(s)                      | 16         |
+| thread(s) per core          | 2          |
+| Core(s) per socket          | 8          |
+| Socket(s)                   | 1          |
+| NUMA node(s)                | 8          |
+| L2 cache                    | 2 MiB      |
+| L1d cache                   | 256 KiB    |
+| L3 cache                    | 16 MiB     |
+| L1i cache                   | 256 KiB    |
 **Note**: all executions used single precision 32-bit floats.
 
-### Single-IPU Executions
+## Software Set-up
+| Software                       | Version        |
+|---------------------------------|--------------|
+| IPU Overall Software Version    | 2.5.0        |
+| POPLAR version                  | 3.2.0        |
+| ICU firmware Version            | 2.4.4        |
+| clang version                   | 15.0.0       |
+| Python                          | 3.10.8       |
+| Devito                          | 4.8.1        |
 
-The heat equation and Aliev-Panfilov model were executed on one IPU and on a Linux server with 2 CPUs. All executions ran for 1000 time steps. The measured performance is shown in the table below:
+# Experiment Setup
 
-| Processor | Problem     | Mesh        | Time   | Throughput  | Throughput/core  | Minimal Bandwidth |
-| --------- | ----------- | ----------- | ------ | ----------- | ---------------- | ----------------- |
-| CPU       | 2D heat eq. | 8000x8000   | 4.05 s | 94.7 GFLOPS | 1.48 GFLOPS | 126.4 GB/s        |
-| CPU       | 3D heat eq. | 360x360x360 | 8.83 s | 41.6 GFLOPS | 0.65 GFLOPS | 42.3 GB/s         |
-| CPU       | A-P model   | 7000x7000   | 20.5 s | 66.9 GFLOPS | 1.05 GFLOPS | 19.1 GB/s         |
-| IPU       | 2D heat eq. | 8000x8000   | 0.30 s | 1.28 TFLOPS | 0.87 TFLOPS | 4.28 TB/s         |
-| IPU       | 3D heat eq. | 360x360x360 | 0.26 s | 1.44 TFLOPS | 0.98 TFLOPS | 5.15 TB/s         |
-| IPU       | A-P model   | 7000x7000   | 1.09 s | 1.26 TFLOPS | 0.86 TFLOPS | 1.45 TB/s         |
+Three separate experiments are conducted to measure various aspects of IPU performance. 
 
-### Multi-IPU Executions
+## Hardware Comparison
+The first experiment runs a fixed size problem with a space order of 4 on the IPU on the listed hardware from previous section. The grid size is set to maximise the memory usage of a single IPU, which is $342^3$ and $225^3$ for the diffusion equation and wave equation, respectively. This experiment intends to compare the performance of IPU in comparison to other hardware alternatives. The norms of the resulting matrix from this experiment are compared to ensure the same operations are performed on all hardware platforms.
+## Strong Scaling
+The second experiment also runs a fixed-size problem but varies the number of IPU used to compute the problem. This experiment is intended to measure the strong scaling capability of the IPU. 
+## Weak Scaling
+The last experiment varies both the number of IPU and problem size, where problem sizes increase almost linearly with the number of IPUs. This experiment measures the weak scaling capability of the IPU.
 
-The heat equation was applied to 2D, and 3D meshes on executions ranging from 1 to 16 IPUs. All executions ran for 1000 time steps. The measured performance is shown in the table below:
+# Evaluation
+## Hardware Comparison
+#### **Diffusion Equation**
+| Throuput                      | Time        |
+|---------------------------------|--------------|
+| ![alt text](./Figures/diff_hardware_gpts.png)   |![alt text](./Figures/diff_hardware_time.png)       |
 
-| No. IPUs | Problem | Mesh        | Time   | Throughput  | Throughput/core  | Minimal Bandwidth |
-| -------- | ------- | ----------- | ------ | ----------- | ---------------- | ----------------- |
-| 1        | 2D      | 8000x8000   | 0.30 s | 1.28 TFLOPS | 0.87 TFLOPS | 4.28 TB/s         |
-| 2        | 2D      | 10000x10000 | 0.28 s | 2.17 TFLOPS | 0.74 TFLOPS | 7.20 TB/s         |
-| 4        | 2D      | 14000x14000 | 0.27 s | 4.35 TFLOPS | 0.74 TFLOPS | 14.6 TB/s         |
-| 8        | 2D      | 19000x19000 | 0.25 s | 8.59 TFLOPS | 0.74 TFLOPS | 29.1 TB/s         |
-| 16       | 2D      | 27000x27000 | 0.25 s | 17.2 TFLOPS | 0.73 TFLOPS | 58.9 TB/s         |
-| 1        | 3D      | 360x360x360 | 0.26 s | 1.44 TFLOPS | 0.98 TFLOPS | 5.15 TB/s         |
-| 2        | 3D      | 403x403x403 | 0.23 s | 2.30 TFLOPS | 0.78 TFLOPS | 8.30 TB/s         |
-| 4        | 3D      | 508x508x508 | 0.26 s | 4.05 TFLOPS | 0.69 TFLOPS | 14.7 TB/s         |
-| 8        | 3D      | 640x640x640 | 0.26 s | 7.99 TFLOPS | 0.68 TFLOPS | 29.1 TB/s         |
-| 16       | 3D      | 806x806x806 | 0.32 s | 13.2 TFLOPS | 0.56 TFLOPS | 48.0 TB/s         |
+#### **Wave Equation**
+| Throuput                      | Time        |
+|---------------------------------|--------------|
+| ![alt text](./Figures/wave_hardware_gpts.png)            | ![alt text](./Figures/wave_hardware_time.png)       |
+
+#### Result Comparison
+![alt text](./Figures/wave_hardware_diff.png) 
+
+## Hardware Comparison Result 
+
+| Throuput                      | Time        |
+|---------------------------------|--------------|
+| ![alt text](./Figures/wave_hardware_gpts.png)            | ![alt text](./Figures/wave_hardware_time.png)       |
+
+
+## Strong Scaling Result 
+| Equation        | Size    | Space Order | Processor | No. of Unit | Time  | Throughput     |
+|-----------------|---------|-------------|-----------|-------------|-------|----------------|
+| Diffusion       | $342^3$ | 4           | MK2 IPU   | 1           | 1.096 | 36.497 GPts/s  |
+| Diffusion       | $342^3$ | 4           | MK2 IPU   | 2           | 0.605 | 66.108 GPts/s  |
+| Diffusion       | $342^3$ | 4           | MK2 IPU   | 4           | 0.370 | 108.140 GPts/s |
+| Wave            | $225^3$ | 4           | MK2 IPU   | 1           | 0.71  | 26.51 GPts/s   |
+| Wave            | $225^3$ | 4           | MK2 IPU   | 2           | 0.38  | 49.67 GPts/s   |
+| Wave            | $225^3$ | 4           | MK2 IPU   | 4           | 0.27  | 68.68 GPts/s   |
+
+For Reference, the memory partition used for the above experiments are included below
+| Problem   | No. of IPU | Smallest Partition | Surface Area to Volume Ratio \% |
+|-----------|------------|--------------------|---------------------------------|
+| Diffusion | 1          | $14\times42\times42$ | $23.80\%$                      |
+| Diffusion | 2          | $14\times21\times42$ | $28.57\%$                      |
+| Diffusion | 4          | $14\times21\times21$ | $33.33\%$                      |
+| Wave      | 1          | $9\times27\times27$  | $37.04\%$                      |
+| Wave      | 2          | $9\times13\times27$  | $45.01\%$                      |
+| Wave      | 4          | $9\times27\times13$  | $52.99\%$                      |
+
+
+## Weak Scaling Result 
+#### **Diffusion Equation**
+| Throuput                      | Time        |
+|---------------------------------|--------------|
+| ![alt text](./Figures/diff_weak_gpts.png) | ![alt text](./Figures/diff_weak_time.png)       |
+#### **Wave Equation**
+| Throuput                      | Time        |
+|---------------------------------|--------------|
+| ![alt text](./Figures/wave_weak_gpts.png) | ![alt text](./Figures/wave_weak_time.png)       |
+
+
