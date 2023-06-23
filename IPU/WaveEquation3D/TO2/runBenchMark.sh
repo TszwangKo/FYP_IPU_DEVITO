@@ -7,9 +7,9 @@ mkdir -p ./devito/BenchMarks
 
 set -e
 
-NT=200
-SIDE=(0 51 240 0 240)
-IPU_NO=(1)
+NT=3000
+SIDE=(0 225 280 0 350)
+IPU_NO=(1 2 4)
 
 echo -ne "\n"
 while getopts "itrcp" flag
@@ -48,13 +48,13 @@ do
    if [ -z ${LOAD_EXE+x} ]
    then
       echo -ne "BenchMarking CPU...\n"
-      DEVITO_LANGUAGE=openmp DEVITO_LOGGING=DEBUG python3 wave_source.py --shape ${INNER_SIDE_LENGTH} ${INNER_SIDE_LENGTH} ${INNER_SIDE_LENGTH} --nt $NT $PLOT 2> ./BenchMarks/${BUFFERED_SIDE}x${NT}xcpu.txt && >&2 echo -e "\njson created for ${i} ipu side: ${BUFFERED_SIDE}(Optimised)\n"
+      DEVITO_LANGUAGE=openmp DEVITO_LOGGING=DEBUG python3 ./wave_source.py --shape ${INNER_SIDE_LENGTH} ${INNER_SIDE_LENGTH} ${INNER_SIDE_LENGTH} --nt $NT $PLOT 2>&1 | tee ./BenchMarks/${BUFFERED_SIDE}x${NT}xcpu.txt && >&2 echo -e "\njson created for ${i} ipu side: ${BUFFERED_SIDE}(Optimised)\n"
    fi
    cd /home/aaronko/workspace/FYP_IPU_DEVITO/IPU/WaveEquation3D/TO2/
    
    echo -ne "BenchMarking IPU...\n"
    echo -ne "Reading from ./devito/parameters_${BUFFERED_SIDE}_${NT}.json\n"
-   ./main --num-ipus ${i} --depth ${BUFFERED_SIDE} --height ${BUFFERED_SIDE} --width ${BUFFERED_SIDE} --nt $NT $LOAD_EXE $CPU > ./BenchMarks/${BUFFERED_SIDE}x${NT}x${i}ipus.txt
+   time ./main --num-ipus ${i} --depth ${BUFFERED_SIDE} --height ${BUFFERED_SIDE} --width ${BUFFERED_SIDE} --nt $NT $LOAD_EXE $CPU | tee ./BenchMarks/${BUFFERED_SIDE}x${NT}x${i}ipus.txt
    if [ ! -z ${PLOT+x} ]
    then
       echo -ne "Plotting IPU result"

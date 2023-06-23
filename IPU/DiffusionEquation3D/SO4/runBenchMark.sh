@@ -6,8 +6,10 @@ mkdir -p BenchMarks
 
 ITERATION=1000
 
-SIDE_ARRAY=( 0 342 342 0 342 )
-for i in  2 4
+#  SIDE_ARRAY=( 0 320 400 0 480 ) for Weak Scaling Experiment
+#  SIDE_ARRAY=( 0 342 342 0 342 ) for Strong Scaling Experiment
+SIDE_ARRAY=( 0 320 400 0 480 )
+for i in  1 2 4
 do
    INNER_SIDE_LENGTH=${SIDE_ARRAY[i]}
    BUFFERED_SIDE=$(($INNER_SIDE_LENGTH))
